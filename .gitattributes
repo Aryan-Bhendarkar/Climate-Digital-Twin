@@ -1,0 +1,3 @@
+dashboard/v2/** -text
+*.woff2 binary
+dashboard/ui/package-lock.json -text

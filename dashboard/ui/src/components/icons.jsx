@@ -1,0 +1,3 @@
+import { Play, Pause, Thermometer, Droplet, Wind, Gauge, WifiOff, ShieldCheck, Check, X, ChevronRight, ChevronDown, Pencil, TriangleAlert, ArrowUp, ArrowDown, Minus } from 'lucide-preact';
+const MAP = { play: Play, pause: Pause, thermo: Thermometer, droplet: Droplet, wind: Wind, gauge: Gauge, offline: WifiOff, shield: ShieldCheck, check: Check, x: X, right: ChevronRight, down: ChevronDown, draw: Pencil, warn: TriangleAlert, up: ArrowUp, down: ArrowDown, flat: Minus };
+export function Icon({ name, size = 16, ...rest }) { const C = MAP[name]; return C ? <C size={size} strokeWidth={1.5} aria-hidden="true" {...rest} /> : null; }
