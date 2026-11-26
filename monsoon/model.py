@@ -174,11 +174,39 @@ class Emulator(nn.Module):
         return self.z_to_phys(z)
 
 
-def load_emulator(path, map_location="cpu") -> "Emulator":
-    """Build an Emulator from a checkpoint saved by training/train.py (older checkpoints without 'gain' -> gain = 1)."""
-    ck = torch.load(path, map_location=map_location, weights_only=False)
+class EnsembleEmulator(nn.Module):
+    """Average of several independently trained Emulators (different random seeds).
+
+    Each member runs its own full rollout from the same input; the outputs are averaged in physical units.
+    Every member is local (≤ 8 grid cells/day) and deterministic, so the average is too."""
+
+    def __init__(self, members):
+        super().__init__()
+        self.members = nn.ModuleList(members)
+        self.arch = f"{members[0].arch}-x{len(members)}"
+
+    @property
+    def clim_coef(self):
+        return self.members[0].clim_coef
+
+    @torch.no_grad()
+    def simulate(self, init_states: torch.Tensor, doy_sincos: torch.Tensor, steps: int) -> torch.Tensor:
+        return torch.stack([m.simulate(init_states, doy_sincos, steps) for m in self.members]).mean(0)
+
+
+def _build(ck) -> "Emulator":
     m = Emulator(arch=ck.get("arch", "local"), width=ck.get("width", 96), depth=ck.get("depth", 8))
     sd = dict(ck["state_dict"])
     sd.setdefault("gain", torch.ones(MAX_LEAD, N_CH))
     m.load_state_dict(sd)
     return m.eval()
+
+
+def load_emulator(path, map_location="cpu"):
+    """Build the model from a checkpoint: a single Emulator saved by training/train.py, or an ensemble
+    file made by training/make_ensemble.py ({"ensemble": [checkpoint, ...]}). Older checkpoints without
+    'gain' get gain = 1."""
+    ck = torch.load(path, map_location=map_location, weights_only=False)
+    if "ensemble" in ck:
+        return EnsembleEmulator([_build(c) for c in ck["ensemble"]]).eval()
+    return _build(ck)
