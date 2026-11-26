@@ -11,7 +11,8 @@ pip install torch xarray netCDF4 numpy scipy pandas fastapi uvicorn
 ```bash
 python training/train.py --data ../data/india_climate_train.nc --train-end 2018 --out weights/val.pt --device cuda
 ```
-Default recipe: arch `local` (width 96, depth 8, reach exactly 8 cells/day), stages `1:40,2:10,4:10,8:12,10:4`.
+Script defaults: arch `local` (width 96, depth 8, reach exactly 8 cells/day), stages `1:40,2:10,4:10,8:12,10:4`.
+**The submitted weights used the smaller recipe in README → "Reproduce the submitted weights"** (width 48, stages `1:20,2:5,4:5,8:4`).
 On a laptop GPU this should take roughly 20–40 min. `weights/val.pt` = EMA weights, `weights/val_raw.pt` = raw.
 
 ## 1b. Calibrate (per-lead output shrinkage toward climatology, fit on the SAME training years)
