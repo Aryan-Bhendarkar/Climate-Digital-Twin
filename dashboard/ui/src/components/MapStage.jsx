@@ -100,7 +100,7 @@ export function HoverTip() {
   const { v, cell } = t, dec = v.dec, ch = t.M != null ? t.M - t.P : null;
   return (
     <div class="tip" style={{ left: Math.min(t.x + 14, innerWidth - 220) + 'px', top: Math.min(t.y + 14, innerHeight - 120) + 'px' }}>
-      <b>{cell.lat.toFixed(1)}°N, {cell.lon.toFixed(1)}°E</b>
+      <b>{cell.lat.toFixed(1)}°N, {cell.lon.toFixed(1)}°E, day {S.day.value}</b>
       <div>Normal <b>{fmtN(t.P, dec)}</b> {v.unit}</div>
       {t.M != null && <div>What-if <b>{fmtN(t.M, dec)}</b> {v.unit}</div>}
       {ch != null && <div>Change <b>{sgn(ch, Math.abs(ch) < 10 ? 2 : 1)}</b> {v.unit}</div>}

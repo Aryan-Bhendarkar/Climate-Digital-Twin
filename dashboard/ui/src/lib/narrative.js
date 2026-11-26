@@ -80,7 +80,8 @@ export function computeImpact(prime, mv, assets, doySC) {
 
 /** Bars: strongest |effect| first, small ones summarised at the end. Shared by the side panel and the e2e test. */
 export function stateBars(K, n = 8) {
-  const rows = [...K.rows].sort((a, b) => Math.abs(rainVal(b)) - Math.abs(rainVal(a)) || (b.dRain - a.dRain));
+  // % rows (real normal rain) first, strongest |change| first; then near-dry states (mm), which are never comparable to %
+  const rows = [...K.rows].sort((a, b) => (lowBase(a) - lowBase(b)) || (Math.abs(rainVal(b)) - Math.abs(rainVal(a))));
   const big = rows.filter((x) => (lowBase(x) ? Math.abs(dMm(x)) >= 0.5 : Math.abs(x.dRain) >= 2));
   const shown = big.slice(0, n);
   return { rows, shown, hidden: rows.length - shown.length };

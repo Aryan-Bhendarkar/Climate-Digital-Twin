@@ -1,6 +1,6 @@
 import { useMemo } from 'preact/hooks';
 import * as S from '../store.js';
-import { sgn, fmtRain, lowBase, rainVal, LOW_RAIN_MM, HEAT_DEF } from '../lib/narrative.js';
+import { sgn, fmtRain, lowBase, stateBars, LOW_RAIN_MM, HEAT_DEF } from '../lib/narrative.js';
 import { Chart, AX } from './Chart.jsx';
 import { PlaceChart } from './SidePanel.jsx';
 import { Icon } from './icons.jsx';
@@ -9,7 +9,7 @@ const TABS = [['states', 'State table'], ['wind', 'Wind power'], ['ripple', 'Rip
 function Empty() { return <p class="side-empty">Run a what-if first. The tables compare the what-if with the normal forecast.</p>; }
 
 function StateTable({ r }) {
-  const rows = [...r.imp.K.rows].sort((a, b) => Math.abs(rainVal(b)) - Math.abs(rainVal(a)));
+  const rows = stateBars(r.imp.K).rows;
   return (
     <div>
     <table class="tbl"><caption>Rain and heat by state, 10 days, compared with the normal forecast. States with under {LOW_RAIN_MM} mm of normal rain show the change in mm.</caption>

@@ -57,7 +57,7 @@ export function App() {
     S.boot().then(() => { if (S.params.get('tour')) startTour(); }).catch((e) => { console.warn(e); S.setError('The dashboard could not start. Reload the page.', String(e && e.message)); });
     const key = (e) => {
       const tag = document.activeElement && document.activeElement.tagName;
-      if (e.key === 'Escape') { if (S.tour.value != null) exitTour(); else if (S.drawer.value) S.drawer.value = null; return; }
+      if (e.key === 'Escape') { if (S.tour.value != null) exitTour(); else if (S.drawer.value) S.drawer.value = null; else if (S.place.value) S.place.value = null; return; }
       if (/INPUT|SELECT|TEXTAREA|BUTTON/.test(tag) && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       if (/INPUT|SELECT|TEXTAREA/.test(tag)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
