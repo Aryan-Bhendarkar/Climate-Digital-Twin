@@ -62,7 +62,7 @@ export function App() {
       if (/INPUT|SELECT|TEXTAREA/.test(tag)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === ' ') { e.preventDefault(); S.play(!S.playing.value); }
-      else if (e.key === 'ArrowRight') { S.play(false); S.setDay(S.day.value + 1); } else if (e.key === 'ArrowLeft') { S.play(false); S.setDay(S.day.value - 1); }
+      else if (e.key === 'ArrowRight') { S.play(false); S.stepDay(1); } else if (e.key === 'ArrowLeft') { S.play(false); S.stepDay(-1); }
       else if (/^[1-5]$/.test(e.key)) S.varKey.value = ['t2m', 'tp', 'wind', 'tcwv', 'msl'][+e.key - 1];
       else if (e.key === 't' || e.key === 'T') startTour();
     };

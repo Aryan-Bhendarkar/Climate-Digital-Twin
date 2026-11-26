@@ -36,6 +36,28 @@ def settle(pg, t=2500):
 NUM = re.compile(r'([+\u2212-]?\d+(?:\.\d+)?)')
 def num(s): m = NUM.search(s.replace('\u00a0', ' ')); return float(m.group(1).replace('\u2212', '-')) if m else None
 
+# Mean of the drawn map field over one state's grid cells, weighted like the state bars (land fraction x cos latitude),
+# plus how many of its cells are drawn brown (red > blue). Reads window.__mapProbe (components/MapStage.jsx).
+PROBE = """async (name) => {
+  const g = await (await fetch('../assets/grid_states.json')).json(), pr = window.__mapProbe();
+  const id = Object.keys(g.meta).find((k) => g.meta[k].name === name); if (!pr || !id) return null;
+  let s = 0, w = 0, brown = 0;
+  for (const [k, f] of g.cells[id]) { const c = f * Math.cos((6.5 + Math.floor(k / 36)) * Math.PI / 180); s += c * pr.values[k]; w += c; const [R, G, B, A] = pr.rgb[k]; if (R > B && A > 0) brown++; }
+  return { view: pr.view, mode: pr.mode, varKey: pr.varKey, mean: s / w, n: g.cells[id].length, brown };
+}"""
+HL_FIRST = re.compile(r'^10-day rain: (.+?) ([+\u2212-][\d.]+)\s?(%|mm)')
+
+def total_agrees(pg, tag):
+    """The map is on rain, "Only the change", 10-day total, and its mean change over the headline's first state has the headline's sign."""
+    check(pg.locator('.scrub').get_attribute('data-view') == 'total' and '10-day' in pg.locator('.scrub-day').inner_text(), f'{tag}: day control on the 10-day total')
+    hl = pg.locator('.headline').inner_text().replace('\u00a0', ' '); m = HL_FIRST.match(hl)
+    if not m: check(not hl.startswith('10-day rain:'), f'{tag}: headline parsed ({hl[:60]})'); return None
+    st, sign = m.group(1), (-1 if m.group(2)[0] in '-\u2212' else 1)
+    r = pg.evaluate(PROBE, st)
+    ok = bool(r) and r['view'] == 'total' and r['mode'] == 'diff' and r['varKey'] == 'tp' and r['mean'] * sign > 0
+    check(ok, f'{tag}: map 10-day total over {st} {r and round(r["mean"], 2)} mm has the headline sign {m.group(2)}{m.group(3)}')
+    return r
+
 def consistency(pg, tag):
     """Honesty checks on one result: range contains main, headline numbers == bar numbers, card == bar, plate == headline."""
     if pg.locator('[data-fig=rain] .none').count() == 0:
@@ -57,7 +79,8 @@ def consistency(pg, tag):
         check(bars.get(st) == card, f'{tag}: card {st} {card} == bar {bars.get(st)}')
     check('%' not in ''.join(v for st, v in bars.items() if 'mm' in v), f'{tag}: dry states in mm only')
     title = pg.locator('.plate-title').inner_text()
-    check(title.startswith('Only the change: rain'), f'{tag}: plate shows the headline variable: {title}')
+    check(title == 'Rain change, 10-day total', f'{tag}: plate shows the headline variable and the 10-day total: {title}')
+    total_agrees(pg, tag)
     loc = pg.locator('[data-locality]').get_attribute('data-locality'); tr = pg.locator('.trust').inner_text()
     check(not loc or ('No smearing' in tr) == (float(loc) >= 95), f'{tag}: "No smearing" only at >= 95 % ({loc})')
     if pg.locator('.states .link', has_text='Show fewer').count(): pg.locator('.states .link', has_text='Show fewer').click()
@@ -76,6 +99,10 @@ with sync_playwright() as p:
     check('not a forecast' in pg.locator('.honest').inner_text() and hb['y'] + hb['height'] <= tt['y'], 'honesty line visible above the trust strip at 1366x768')
     check('direction reliable' not in pg.content() and 'Works offline' not in pg.content() and 'Plate 2' not in pg.content(), 'old wording gone')
     consistency(pg, 'landing')
+    for st in ('Haryana', 'Punjab'):
+        r = pg.evaluate(PROBE, st)
+        check(r and r['mean'] < 0 and r['brown'] == r['n'], f'landing: {st} brown on the 10-day total map ({r and round(r["mean"], 2)} mm, {r and r["brown"]}/{r and r["n"]} cells brown)')
+    check('mm over 10 days' in pg.locator('.legend').inner_text(), 'legend: 10-day total in mm over 10 days')
     y0 = pg.locator('.map-box canvas').bounding_box()['y']; pg.get_by_role('button', name='Explore on my own').click(); pg.wait_for_timeout(400)
     check(abs(pg.locator('.map-box canvas').bounding_box()['y'] - y0) < 1, 'no plate jump when the hero closes')
     # draw-your-own fully visible at 1366x768
@@ -122,6 +149,20 @@ with sync_playwright() as p:
     check('Day 10' in pg.locator('.scrub-day').inner_text(), 'scrubber: day 10')
     pg.keyboard.press('ArrowLeft'); pg.wait_for_timeout(100)
     check('Day 9' in pg.locator('.scrub-day').inner_text(), 'keyboard: arrow left')
+    pg.keyboard.press('ArrowRight'); pg.keyboard.press('ArrowRight'); pg.wait_for_timeout(200)
+    check(pg.locator('.scrub').get_attribute('data-view') == 'total' and pg.locator('.plate-title').inner_text() == 'Rain change, 10-day total', 'keyboard: past day 10 is the 10-day total')
+    pg.get_by_role('tab', name='Temperature', exact=True).click(); pg.wait_for_timeout(200)
+    check(pg.locator('.plate-title').inner_text() == 'Temperature change, 10-day average' and '°C, 10-day average' in pg.locator('.legend').inner_text(), 'temperature: 10-day average wording')
+    pg.get_by_role('tab', name='Normal forecast', exact=True).click(); pg.wait_for_timeout(200)
+    check(pg.evaluate("window.__mapProbe().view") == 'total' and pg.locator('.plate-title').inner_text().startswith('Normal forecast: temperature, 10-day average'), 'normal tab: 10-day average')
+    pg.get_by_role('tab', name='Rain', exact=True).click(); pg.wait_for_timeout(200)
+    check('mm over 10 days' in pg.locator('.legend').inner_text() and 'IMD' not in pg.locator('.legend').inner_text(), 'normal tab: rain in mm over 10 days'); shot(pg, 'normal_rain_total')
+    pg.get_by_role('tab', name='Only the change', exact=True).click(); pg.wait_for_timeout(200)
+    pg.get_by_role('button', name='Play the 10 days').click(); pg.wait_for_timeout(400)
+    check(pg.locator('.scrub').get_attribute('data-view') == 'day' and 'Day 1' in pg.locator('.scrub-day').inner_text(), 'play from the total starts at day 1')
+    pg.wait_for_function("document.querySelector('.scrub').dataset.view==='total'", timeout=15000); pg.wait_for_timeout(200)
+    check(pg.get_by_role('button', name='Play the 10 days').count() == 1 and '10-day' in pg.locator('.scrub-day').inner_text(), 'play ends on the 10-day total and stops')
+    pg.locator('.scrub input').fill('9'); pg.wait_for_timeout(100)
     # side panel tabs + place
     pg.get_by_role('tab', name='Spread').click(); pg.wait_for_timeout(500); check(pg.locator('.mini').count() == 4, 'spread: 4 small multiples'); shot(pg, 'spread')
     box = pg.locator('.map-box canvas').bounding_box()
@@ -145,6 +186,7 @@ with sync_playwright() as p:
         body = pg.locator('.tour-card p').inner_text()
         check('running' not in body and 'last day' not in body, f'tour step {k+1} copy: {body[:110]}')
         fs = pg.evaluate("parseFloat(getComputedStyle(document.querySelector('.tour-card p')).fontSize)"); check(fs >= 13, f'tour caption font {fs}px >= 13')
+        if k in (3, 4): total_agrees(pg, f'tour step {k+1}')
         if k == 6: check(pg.locator('.builder select').nth(1).input_value() == 'bob' and 'Bay of Bengal' in body, 'tour step 7: form preset matches the caption')
         shot(pg, f'tour_step{k+1}_1366x768')
         pg.locator('.tour-card .btn.primary').click(); pg.wait_for_timeout(300)

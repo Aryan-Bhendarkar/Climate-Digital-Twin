@@ -49,7 +49,7 @@ function Mini({ d, vi }) {
     g.stroke();
     const box = S.result.value && S.result.value.box; if (box) { const [x0, y0] = px(lon(box.j0) - 0.5, lat(box.i1) + 0.5), [x1, y1] = px(lon(box.j1) + 0.5, lat(box.i0) - 0.5); g.strokeStyle = '#C27C0E'; g.lineWidth = 1.3; g.setLineDash([3, 2]); g.strokeRect(x0, y0, x1 - x0, y1 - y0); }
   }, [b, out, d, vi, S.result.value]);
-  return <button class={'mini' + (S.day.value === d + 1 ? ' on' : '')} onClick={() => { S.play(false); S.setDay(d + 1); }} aria-label={`Show day ${d + 1}`}><canvas ref={ref} /><span>Day {d + 1}</span></button>;
+  return <button class={'mini' + (!S.total.value && S.day.value === d + 1 ? ' on' : '')} onClick={() => { S.play(false); S.setDay(d + 1); }} aria-label={`Show day ${d + 1}`}><canvas ref={ref} /><span>Day {d + 1}</span></button>;
 }
 
 function Spread() {

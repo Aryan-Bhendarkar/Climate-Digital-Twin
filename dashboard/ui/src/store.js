@@ -28,6 +28,7 @@ export const result = signal(null);                  // what-if outcome (see run
 export const mode = signal('normal');                // normal | whatif | diff
 export const varKey = signal('tp');
 export const day = signal(1);
+export const total = signal(false);                 // true: the map shows the 10-day total (rain) / 10-day mean (others), not one day
 export const playing = signal(false);
 export const busy = signal(0);
 export const busyText = signal('');
@@ -75,7 +76,7 @@ export async function loadSample(file, auto) {
   const js = await (await fetch(BASE + 'samples/' + file)).json();
   const meta = samples.value.find((s) => s.file === file) || {};
   playing.value = false; clearTimeout(timer);
-  batch(() => { sample.value = { file, name: js.name, date_label: meta.date_label || js.date_label, init: flatten(js.init_states), doy: js.doy_sincos.map(Number) }; bundle.value = null; result.value = null; day.value = 1; mode.value = 'normal'; nullTest.value = null; place.value = null; drawBox.value = null; });
+  batch(() => { sample.value = { file, name: js.name, date_label: meta.date_label || js.date_label, init: flatten(js.init_states), doy: js.doy_sincos.map(Number) }; bundle.value = null; result.value = null; day.value = 1; total.value = false; mode.value = 'normal'; nullTest.value = null; place.value = null; drawBox.value = null; });
   if (health.value !== 'ready') return;
   if (auto) return runWhatIf(typeof auto === 'string' ? SCENARIOS.find((s) => s.id === auto) : auto);
   return runBase();
@@ -103,10 +104,10 @@ export async function runWhatIf(sc, opts = {}) {
     if (shk.roll.some((x) => !Number.isFinite(x))) throw new Error('The model returned invalid numbers for this what-if.');
     const imp = computeImpact(base.roll, shk.roll, assets.value, sm.doy), hl = headline(imp), figs = figures(imp), rip = ripple(base.roll, shk.roll, box);
     const b = { id: nextBundle++, prime: base.roll, mv: shk.roll, cache: {} };
-    // The headline is about 10-day rain, so the plate shows rain, "Only the change", day 10 (the tour may change this in its own steps).
+    // The headline and bars are 10-day rain totals, so the plate shows rain, "Only the change", 10-day total (the tour may change this in its own steps).
     play(false);
     batch(() => {
-      bundle.value = b; speedMs.value = base.ms; varKey.value = 'tp'; mode.value = 'diff'; day.value = opts.keepDay ? day.value : stepsOf(b.prime);
+      bundle.value = b; speedMs.value = base.ms; varKey.value = 'tp'; mode.value = 'diff'; if (!opts.keepDay) { day.value = stepsOf(b.prime); total.value = true; }
       if (sc.id === 'custom') { customOpen.value = false; customFresh.value = false; }
       result.value = { id: b.id, sc, box, pert, imp, hl, figs, rip, ms: shk.ms, clamped, range: null };
       if (!opts.keepPlace) place.value = null; setError(null);
@@ -153,13 +154,25 @@ export async function runNull() {
 function ensureNull() { if (!nullTest.value) runNull(); }
 
 // ---------- playback ----------
+const nDays = () => stepsOf(bundle.value ? bundle.value.prime : new Float32Array(10 * NCH * NCELL));
+/** Play days 1..10 (from day 1 if on the total or the last day), then come back to the 10-day total and stop. */
 export function play(on) {
   if (on && !bundle.value) return;
   playing.value = on; clearTimeout(timer);
-  const tick = () => { if (!playing.value) return; const last = day.value >= 10; setDay(last ? 1 : day.value + 1); timer = setTimeout(tick, day.value >= 10 ? 1500 : 800); };
-  if (on) timer = setTimeout(tick, 800);
+  if (!on) return;
+  if (total.value || day.value >= nDays()) setDay(1);
+  const tick = () => {
+    if (!playing.value) return;
+    if (day.value >= nDays()) { batch(() => { playing.value = false; total.value = true; }); return; }
+    setDay(day.value + 1); timer = setTimeout(tick, day.value >= nDays() ? 1500 : 800);
+  };
+  timer = setTimeout(tick, 800);
 }
-export function setDay(d) { day.value = Math.max(1, Math.min(stepsOf(bundle.value ? bundle.value.prime : new Float32Array(10 * NCH * NCELL)), d)); }
+/** Show one day (1..10). A value past the last day selects the 10-day total. */
+export function setDay(d) { const n = nDays(); batch(() => { total.value = d > n; day.value = Math.max(1, Math.min(n, d)); }); }
+export function setTotal() { batch(() => { day.value = nDays(); total.value = true; }); }
+/** Arrow keys: ... day 9, day 10, 10-day total. */
+export function stepDay(delta) { if (total.value) { if (delta < 0) setDay(nDays()); } else setDay(day.value + delta); }
 export function setMode(m) { if (m === 'normal' || (result.value && bundle.value && bundle.value.mv)) mode.value = m; }
 
 // ---------- boot ----------

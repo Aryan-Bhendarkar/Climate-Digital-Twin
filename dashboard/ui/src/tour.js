@@ -21,8 +21,8 @@ const dateOf = (file) => { const m = S.samples.value.find((s) => s.file === file
 /** live: the headline currently on screen, if it belongs to scenario t */
 const live = (t) => (same(t.file, t.scenario) ? S.result.value.hl.text : 'running…');
 const customText = (c) => { const w = CUSTOM_WHAT.find((x) => x.id === c.what), r = REGIONS.find((x) => x.id === c.where); return `${w.label.toLowerCase()} ${w.fmtv(c.amt)} over the ${r.name}`; };
-// After the tour: back to what the headline describes (rain, "Only the change", day 10).
-function restore() { S.play(false); if (S.result.value) { S.varKey.value = 'tp'; S.setMode('diff'); S.setDay(10); S.sideTab.value = 'states'; } }
+// After the tour: back to what the headline describes (rain, "Only the change", 10-day total).
+function restore() { S.play(false); if (S.result.value) { S.varKey.value = 'tp'; S.setMode('diff'); S.setTotal(); S.sideTab.value = 'states'; } }
 
 export const STEPS = [
   { id: 'welcome', target: 'map', title: 'An AI twin of India’s weather',
@@ -32,11 +32,11 @@ export const STEPS = [
     body: () => nb(`Each question changes the weather in one region at the start of the forecast, then the AI replays the 10 days. Here: ${scOf(T1).lead}.`),
     run: async () => { S.play(false); if (!same(T1.file, T1.scenario)) await S.loadSample(T1.file, T1.scenario); } },
   { id: 'diff', target: 'map', title: 'Where does the forecast change?',
-    body: () => `This map shows only the change. Brown means drier than normal, teal wetter. Watch it spread out from the box over ${scOf(T1).area}, day by day.`,
+    body: () => `This map shows only the change. Brown means drier than normal, teal wetter. Watch it spread out from the box over ${scOf(T1).area}, day by day, then add up to the 10-day total.`,
     run: async () => { S.setMode('diff'); S.varKey.value = 'tp'; S.sideTab.value = 'spread'; S.setDay(1); await nap(400); S.play(true); } },
   { id: 'who', target: 'result', title: 'Who is affected',
     body: () => `${live(T1)} Then three numbers: rain, heat risk and wind power. The size range re-runs your change at half and 1.5 times the strength.`,
-    run: async () => { S.play(false); S.setMode('diff'); S.varKey.value = 'tp'; S.setDay(10); S.sideTab.value = 'states'; } },
+    run: async () => { S.play(false); S.setMode('diff'); S.varKey.value = 'tp'; S.setTotal(); S.sideTab.value = 'states'; } },
   { id: 'date', target: 'date', title: 'Another day, another question',
     body: () => nb(`${dateOf(T2.file)}, ${DATE_WORDS[T2.file]}. What if ${scOf(T2).lead}? ${live(T2)}`),
     run: async () => { await S.loadSample(T2.file, T2.scenario); } },

@@ -7,6 +7,9 @@ export const NORMAL = {
     stops: [[5, '#2C62AA'], [15, '#6EAAD4'], [22, '#C4E2E8'], [28, '#FFFAC4'], [34, '#FDBE64'], [40, '#E2532D'], [46, '#A01226']] },
   tp: { lo: 0, hi: 60, map: 'sqrt', ticks: [0, 2.5, 15.6, 35, 60],
     stops: [[0, '#F7F9F6'], [1, '#CDE8F0'], [5, '#78BADE'], [15, '#307CBE'], [35, '#1C4894'], [60, '#14286B']] },
+  // 10-day rain total (mm over 10 days): the same colours, stops at roughly 6x the daily ones (10 days are rarely all heavy).
+  tp10: { lo: 0, hi: 400, map: 'sqrt', ticks: [0, 25, 100, 200, 400],
+    stops: [[0, '#F7F9F6'], [5, '#CDE8F0'], [30, '#78BADE'], [90, '#307CBE'], [210, '#1C4894'], [400, '#14286B']] },
   wind: { lo: 0, hi: 60, map: 'lin', ticks: [0, 15, 30, 45, 60], stops: even(['#F6F4FA', '#DAD3E8', '#B4A7D6', '#8A74BC', '#5E3FA0', '#3A1F78'], 0, 60) },
   tcwv: { lo: 0, hi: 70, map: 'lin', ticks: [0, 20, 40, 55, 70], stops: even(['#FAF4E2', '#DEE8BE', '#8CC8AA', '#30968C', '#0A6064', '#043442'], 0, 70) },
   msl: { lo: 990, hi: 1020, map: 'lin', ticks: [990, 998, 1005, 1012, 1020], stops: even(['#00224E', '#35456C', '#666970', '#948E77', '#C8B866', '#FEE838'], 990, 1020) },
