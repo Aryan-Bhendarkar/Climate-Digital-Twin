@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.nc
+data/
+yug-monsoon-kit/
+weights/*_raw.pt
+weights/val*.pt
+.venv/
+venv/
+*.log

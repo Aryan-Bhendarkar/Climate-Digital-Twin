@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monsoon Multiverse — India Climate Digital Twin</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%2338bdf8'/%3E%3C/svg%3E">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo"></span><h1>Monsoon Multiverse <em>— India Climate Digital Twin</em></h1></div>
+  <div class="chips">
+    <span class="chip ok" id="chipOffline" title="Counts network requests that leave this machine (the model server counts as local)"><i></i><span>offline · 0 external requests</span></span>
+    <span class="chip" id="chipHealth"><i></i><span id="healthTxt">checking…</span></span>
+    <label class="srv" title="Model server base URL"><input aria-label="Server URL" id="serverUrl" value="http://localhost:8000" spellcheck="false"></label>
+    <button class="btn ghost" id="btnHow" title="How it works (?)">How it works</button>
+  </div>
+</header>
+
+<div class="layout">
+<aside class="side">
+  <section>
+    <h3>Scenario <span class="hint">3-day initial condition</span></h3>
+    <select id="selSample"></select>
+    <div class="row"><button class="btn small" id="btnLoad">Load JSON…</button><input type="file" id="fileJson" accept=".json,application/json" hidden><span class="hint" id="sampleInfo"></span></div>
+  </section>
+
+  <section>
+    <h3>Variable</h3>
+    <div class="seg" id="segVar"></div>
+    <label class="chk"><input type="checkbox" id="chkArrows"> Wind arrows</label>
+    <label class="chk" title="Rescale the Δ colour bar to each day instead of the whole rollout"><input type="checkbox" id="chkDeltaDay"> Δ scale per day</label>
+  </section>
+
+  <section>
+    <h3>Forecast day <b id="dayLbl" class="mono">1</b><span class="hint"> / 10</span></h3>
+    <div class="row"><button class="btn small primary" id="btnPlay" title="Space">▶ Play</button><input type="range" id="rngDay" min="1" max="10" value="1" step="1"></div>
+  </section>
+
+  <section class="shock">
+    <h3>Shock painter <span class="hint">drag a box on any map</span></h3>
+    <select id="selPreset"></select>
+    <div class="boxline"><span id="boxLbl" class="mono">no box — drag on a map</span><button class="btn tiny ghost" id="btnClearBox">clear</button></div>
+    <div id="comps" class="comps"></div>
+    <div class="row add">
+      <select id="selVar"></select>
+      <input type="number" id="inMag" value="2" step="any" title="Magnitude">
+      <select id="selMode"><option value="abs">abs</option><option value="pct">%</option></select>
+      <button class="btn small" id="btnAdd" title="Add this component to the shock">Add</button>
+    </div>
+    <div class="row"><button class="btn primary grow" id="btnRun" title="R">Run shock</button><button class="btn grow" id="btnNull" title="N">Null shock check</button></div>
+    <div id="nullBadge" class="badge" hidden></div>
+    <div id="clampNote" class="warn" hidden></div>
+  </section>
+  <section class="foot hint">Space = play · ←/→ day · 1–5 variable · R run · N null · ? help</section>
+</aside>
+
+<main class="center">
+  <div class="maps" id="maps">
+    <figure><figcaption><b>Timeline Prime</b><span id="capP" class="mono"></span></figcaption><div class="mapwrap" id="wrapP"><canvas id="cvP"></canvas></div><canvas class="cbar" id="cbP"></canvas></figure>
+    <figure><figcaption><b>Multiverse</b><span id="capM" class="mono"></span></figcaption><div class="mapwrap" id="wrapM"><canvas id="cvM"></canvas></div><canvas class="cbar" id="cbM"></canvas></figure>
+    <figure><figcaption><b>Δ Multiverse − Prime</b><span id="capD" class="mono"></span></figcaption><div class="mapwrap" id="wrapD"><canvas id="cvD"></canvas></div><canvas class="cbar" id="cbD"></canvas></figure>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="ripple" class="on">Ripple</button><button data-tab="cell">Cell series</button><button data-tab="kharif">Kharif Stress Monitor</button><button data-tab="wind">Wind-power index</button><span class="chip mono" id="chipMs" hidden></span>
+  </div>
+  <div class="panes">
+    <div class="pane on" id="pane-ripple">
+      <div class="two">
+        <div class="chartbox"><div class="ctitle">Δ-energy per day · inside box+3 cells vs outside <label class="chk r"><input type="checkbox" id="chkLog" checked> log</label></div><canvas id="cvRipple" class="chart"></canvas>
+          <div class="legend"><span><i style="background:#22d3ee"></i>inside box+3</span><span><i style="background:#fb923c"></i>outside</span></div></div>
+        <div class="stats" id="rippleStats"><div class="empty">Run a shock to see how it ripples.</div></div>
+      </div>
+    </div>
+    <div class="pane" id="pane-cell">
+      <div class="two">
+        <div class="chartbox"><div class="ctitle" id="cellTitle">Click a cell on any map</div><canvas id="cvCell" class="chart"></canvas><div class="legend"><span><i style="background:#60a5fa"></i>Prime</span><span><i style="background:#f472b6"></i>Multiverse</span><span class="hint">day 0 = last input day (shock applied)</span></div></div>
+        <div class="chartbox"><div class="ctitle">Δ at that cell</div><canvas id="cvCellD" class="chart"></canvas></div>
+      </div>
+    </div>
+    <div class="pane" id="pane-kharif">
+      <div class="khead"><div id="kHeadline" class="headline">Run a shock to compare states.</div><div class="hint" id="kSub"></div></div>
+      <div class="kbody"><canvas id="cvStates" class="statemap"></canvas><div class="tablewrap"><table id="kTable"></table></div></div>
+    </div>
+    <div class="pane" id="pane-wind">
+      <div class="khead"><div id="wHeadline" class="headline">Run a shock to compare wind-power potential.</div></div>
+      <div class="tablewrap"><table id="wTable"></table></div>
+      <p class="note">Capacity-factor proxy of a generic turbine (cut-in 3, rated 12, cut-out 25 m/s) from daily-mean 10 m wind scaled to 100 m with a 1/7 power law. Daily means understate the cubic power, so only the Prime-vs-Multiverse <em>change</em> is meaningful.</p>
+    </div>
+  </div>
+</main>
+</div>
+
+<div class="tooltip" id="tip" hidden></div>
+<div class="toasts" id="toasts"></div>
+<div class="overlay" id="busy" hidden><div class="spinner"></div><span id="busyTxt">Running model…</span></div>
+
+<div class="modal" id="modal" hidden><div class="card">
+  <button class="btn ghost close" id="btnClose">✕</button>
+  <h2>How it works</h2>
+  <ul>
+    <li><b>The model.</b> A small fully-convolutional neural emulator steps India's weather one day at a time (t2m, rain, u10, v10, msl, tcwv on a 32×36, 1° grid), rolled forward autoregressively for 10 days from the last 3 observed days.</li>
+    <li><b>Anomalies, not raw fields.</b> It predicts the 1-day change of the anomaly from a smooth seasonal climatology (a few Fourier harmonics per cell, stored in the model weights). Rain is handled in log space so it cannot go negative.</li>
+    <li><b>Local by construction.</b> Each step stacks 8 blocks with a single 3×3 convolution, so information can travel at most 8 cells per day. A shock therefore starts near where it is applied and spreads outward — the Ripple tab measures exactly this.</li>
+    <li><b>Multi-step training.</b> After 1-step training it is fine-tuned on unrolled multi-day rollouts so it learns to correct its own errors and not drift or blur.</li>
+    <li><b>Multiverse.</b> “Run shock” adds your physical delta to the last input day, then calls the same model twice in parallel: Prime (unperturbed) and Multiverse. Δ is Multiverse − Prime. A null shock must be bit-identical.</li>
+    <li><b>Impact.</b> The Kharif Stress Monitor and wind index are computed in your browser from those two live rollouts. Rain departure bands follow IMD conventions but measure departure <em>from Prime</em>; heat-stress uses per-state monthly P95 of daily-mean temperature (training-period climate statistic); they are indicative, not forecasts. State boundaries: Natural Earth (public domain), indicative only.</li>
+    <li><b>Limits.</b> It is a statistical emulator, not a dynamical core: skill fades with lead time, heavy rain is hard, and shocks far outside the training range are extrapolation.</li>
+  </ul>
+</div></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

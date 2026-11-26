@@ -1,0 +1,8 @@
+# runtime (server)
+torch>=2.1
+numpy>=1.24
+fastapi>=0.100
+uvicorn>=0.23
+# training / evaluation only
+xarray>=2023.1
+netCDF4>=1.6

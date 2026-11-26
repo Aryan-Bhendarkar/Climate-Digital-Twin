@@ -1,0 +1,66 @@
+# Monsoon Multiverse — dashboard
+
+Interactive map dashboard + impact module for the India climate digital twin. Pure static HTML + ES modules + Canvas 2D:
+no build step, no npm, no CDN, no map tiles, **zero external requests** (the header chip counts them live).
+Every number on screen comes from live calls to the model server's `POST /simulate`; only the 3-day *input* states in
+`samples/` and geography/climate statistics in `assets/` are shipped.
+
+## Run
+
+```bash
+# terminal 1 – model server (repo root)
+cd repo && python serve.py --port 8000
+# terminal 2 – dashboard
+cd repo/dashboard && python -m http.server 8080
+# open http://localhost:8080
+```
+
+Server URL defaults to `http://localhost:8000` (editable in the header, remembered in localStorage; CORS is enabled in `serve.py`).
+A health chip shows whether the server is ready; errors appear as toasts.
+
+## Using it
+
+| Action | How |
+|---|---|
+| Pick scenario | Left panel: 5 demo initial conditions (monsoon onset, heavy rain, heatwave, Cyclone Amphan, western disturbance) or **Load JSON…** (`{"init_states":[3][6][32][36], "doy_sincos":[sin,cos]}`, physical units) |
+| Variable / day | Temp (°C), Rain (mm/day), Wind speed (+ arrows), MSLP (hPa), TCWV. Slider or Space (play), ←/→ |
+| Shock | Preset (Warm Bay of Bengal, Monsoon stall, Arabian Sea +2.5 °C) or drag a box on any map; add components (variable, magnitude, absolute or %); **Run shock** (Prime and Multiverse run in parallel) |
+| Compare | Three synced panels: Timeline Prime · Multiverse · Δ (Multiverse − Prime, diverging scale). Hover = value tooltip, click = cell time series |
+| Causality | **Ripple** tab: per-day Δ-energy (Σ_ch (Δ/std)²) inside box+3 cells vs outside, day-1 local share, spread, peak |Δ| in σ |
+| Null check | **Null shock check** sends an all-zero perturbation and shows a green badge if it is bit-identical to Prime |
+| Impact | **Kharif Stress Monitor** (state table, sortable) and **Wind-power index** tabs, recomputed from the two rollouts on every run |
+| Keys | Space play · ←/→ day · 1–5 variable · R run · N null · ? help |
+
+## Impact module definitions (computed in `js/impact.js`)
+
+* State/UT masks: Natural Earth admin-1 polygons rasterised once (5×5 sub-samples per cell) into `assets/grid_states.json`
+  (`build_assets.py`). States with < 3 cells of coverage are grouped (NE small states, small UTs, islands).
+* **Rain**: 10-day area-weighted (land fraction × cos lat) state-mean total, Prime vs Multiverse; Δ% = (M−P)/max(P, 5 mm), labelled with
+  IMD-style departure bands (Normal within ±19%, Deficient −20..−59%, Scanty ≤ −60%, Excess ≥ +20%). This is departure **from Prime**, not from LPA.
+* **Dry spell**: longest run of days with state-mean rain < 2.5 mm.
+* **Heat-stress days**: days when state-mean daily t2m exceeds the state's monthly P95 of daily-mean t2m over training years 2005–2018
+  (`assets/heat_p95.json`, a geography/climate statistic, not forecast data).
+* **Stress tier 0–3** = 0.5·rain tier + 0.5·heat tier. Rain tier: departure of the branch's 10-day total from the training-period monthly mean
+  (`assets/rain_clim.json`) — Deficient → 2, Scanty → 3 — +1 if the dry spell is ≥ 7 days; heat tier: 0 days → 0, 1–2 → 1, 3–5 → 2, ≥ 6 → 3.
+  "N states worsen" counts groups whose Multiverse stress is higher than Prime.
+* **Wind index** (GJ, RJ, TN, KA, MH, AP): v100 = |V10|·10^(1/7); generic turbine cut-in 3 / rated 12 / cut-out 25 m/s; capacity-factor proxy
+  from daily-mean wind, so only Prime-vs-Multiverse *changes* are meaningful.
+
+Indicative, not forecasts: 1° daily grid, daily-mean temperature (not Tmax), rain is the least skilful variable.
+
+## Layout
+
+```
+index.html  css/style.css
+js/  main.js (UI/state)  api.js  render.js (canvas maps)  chart.js (own line chart)  colormaps.js  shock.js  impact.js  util.js
+assets/  outlines.json  grid_states.json  heat_p95.json  rain_clim.json
+samples/ *.json (5 demo initial conditions + index.json)
+build_assets.py   offline asset builder (not part of the server)
+```
+
+## Data sources
+
+* State and country boundaries: **Natural Earth** (public domain; admin-1 states/provinces and the India-perspective admin-0 file),
+  clipped to lon 65–101 / lat 6–38 and simplified. Boundaries are **indicative only** and carry no legal standing.
+* Sample inputs, heat/rain climate statistics: the competition training set (2005–2021), via `build_assets.py`
+  (`python build_assets.py --ne <natural-earth-geojson-dir> --nc <india_climate_train.nc>`; needs shapely + xarray; run once, outputs are committed).
