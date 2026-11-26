@@ -1,0 +1,6 @@
+/* Self-hosted, latin subset only. Newsreader (display) and IBM Plex Sans (UI): both SIL OFL 1.1, see FONTS-LICENSE.txt */
+@font-face { font-family: Newsreader; font-style: normal; font-weight: 200 800; font-display: swap; src: url(../fonts/newsreader-normal.woff2) format('woff2'); }
+@font-face { font-family: Newsreader; font-style: italic; font-weight: 200 800; font-display: swap; src: url(../fonts/newsreader-italic.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url(../fonts/plex-400.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 500; font-display: swap; src: url(../fonts/plex-500.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 600; font-display: swap; src: url(../fonts/plex-600.woff2) format('woff2'); }

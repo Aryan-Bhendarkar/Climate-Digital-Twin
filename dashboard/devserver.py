@@ -20,6 +20,14 @@ PREFIX = "/api/"
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     model = "http://127.0.0.1:8000"
+    # Do not trust the OS registry (Windows can map .js to text/plain, which breaks module scripts).
+    extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map,
+                      ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json",
+                      ".css": "text/css", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".html": "text/html"}
+
+    def end_headers(self):             # always revalidate: a stale cached build must never be shown to a judge
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
 
     def address_string(self):          # skip reverse-DNS lookups (slow on some Windows setups)
         return self.client_address[0]
