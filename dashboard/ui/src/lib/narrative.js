@@ -47,47 +47,85 @@ export const SEAS = [{ lon: 68.5, lat: 14.5, text: 'Arabian Sea' }, { lon: 88.5,
 const SKIP = new Set(['ISL', 'UT']); // tiny island/UT groups: not farming regions, would dominate headlines
 function filterK(K) { const rows = K.rows.filter((r) => !SKIP.has(r.id)); return { ...K, rows, worse: rows.filter((r) => r.dStress > 0).length, better: rows.filter((r) => r.dStress < 0).length }; }
 
+// ---------- ONE place for every rain number on screen (headline, card, bars, range, expert table) ----------
+export const LOW_RAIN_MM = 5;      // normal 10-day rain below this: show the change in mm, never in %, never headline it
+export const HEADLINE_PCT = 10;    // a state's rain must move at least this much (%) to be named in the headline
+export const HEAT_MIN_DAYS = 2;    // smaller changes in very hot days are noise: show "no notable change"
+export const HEAT_DEF = 'Very hot day: the state’s average temperature that day is above its hottest 5 % of days for that month (2005–2018).';
+export const lowBase = (row) => row.p.total < LOW_RAIN_MM;
+export const dMm = (row) => row.m.total - row.p.total;
+/** The value a state's rain change is ranked and shown by: % normally, mm when the normal 10-day rain is tiny. */
+export const rainVal = (row) => (lowBase(row) ? dMm(row) : row.dRain);
+/** Rounding used everywhere for a state's rain change (so headline == card == bar). */
+export function fmtRain(row) {
+  if (lowBase(row)) { const d = dMm(row); return nb(`${sgn(d, 1)} mm`); }
+  const x = row.dRain; return nb(`${sgn(x, Math.abs(x) < 10 ? 1 : 0)} %`);
+}
+/** Same rounding for a bare % / mm number (used by the size range). */
+export const fmtPct = (x) => nb(`${sgn(x, Math.abs(x) < 10 ? 1 : 0)} %`);
+export const fmtMm = (x) => nb(`${sgn(x, 1)} mm`);
+/** Rounded numeric value as displayed (so range checks compare like with like). */
+export const shownPct = (x) => +x.toFixed(Math.abs(x) < 10 ? 1 : 0);
+
 /** Same derivation as v1 (story.js computeImpact), built on js/impact.js. */
 export function computeImpact(prime, mv, assets, doySC) {
   const K = filterK(kharif(prime, mv, assets, doySC)), W = windIndex(prime, mv, assets);
-  const rain = K.rows.filter((r) => Math.abs(r.dRain) >= 10).sort((a, b) => Math.abs(b.dRain) - Math.abs(a.dRain));
+  // states eligible to be named: real normal rain and a change of at least HEADLINE_PCT
+  const rain = K.rows.filter((r) => !lowBase(r) && Math.abs(r.dRain) >= HEADLINE_PCT).sort((a, b) => Math.abs(b.dRain) - Math.abs(a.dRain));
   const heat = K.rows.map((r) => ({ r, d: r.m.heat - r.p.heat })).filter((x) => x.d !== 0).sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
   const wsumP = W.reduce((a, w) => a + w.pMean, 0), wsumM = W.reduce((a, w) => a + w.mMean, 0), wAll = wsumP > 0.01 ? ((wsumM - wsumP) / wsumP) * 100 : 0;
   const wTop = [...W].sort((a, b) => Math.abs(b.dPct) - Math.abs(a.dPct))[0];
   return { K, W, rain, heat, wAll, wTop };
 }
 
-const r5 = (x) => Math.round(x / 5) * 5 || Math.round(x);
-/** Headline that names the strongest positive AND negative state effects when both exist. Returns {kind, text, ids, parts}. */
-export function headline(imp) {
-  const { rain, heat, wAll, wTop } = imp, nHeat = heat.filter((x) => x.d > 0).length;
-  const neg = rain.filter((r) => r.dRain < 0).slice(0, 2), pos = rain.filter((r) => r.dRain > 0).slice(0, 2);
-  const part = (rows) => ({ names: rows.map((r) => r.name), pct: r5(rows.reduce((a, r) => a + Math.abs(r.dRain), 0) / rows.length), ids: rows.map((r) => r.id) });
-  const cands = [
-    { kind: 'rain', score: rain.length ? Math.abs(rain[0].dRain) / 10 : 0, build: () => {
-      const n = neg.length ? part(neg) : null, p = pos.length ? part(pos) : null, bits = [];
-      if (n) bits.push(`${joinNames(n.names)} ~${n.pct} % drier`); if (p) bits.push(`${joinNames(p.names)} ~${p.pct} % wetter`);
-      return { text: bits.join('; ') + '.', ids: [...(n ? n.ids : []), ...(p ? p.ids : [])], sub: 'Change in 10-day rain, compared with the normal forecast.' }; } },
-    { kind: 'heat', score: nHeat && heat[0].d > 0 ? heat[0].d / 3 : 0, build: () => ({ text: `${plural(nHeat, 'state')} ${nHeat === 1 ? 'gets' : 'get'} extra very hot days, most in ${heat[0].r.name} (+${heat[0].d}).`, ids: [heat[0].r.id], sub: 'Days hotter than the usual hottest 5 % for the season, over 10 days.' }) },
-    { kind: 'wind', score: Math.max(Math.abs(wAll) / 3, wTop ? Math.abs(wTop.dPct) / 12 : 0), build: () => ({ text: `Wind-farm output ${wAll < 0 ? 'falls' : 'rises'} ~${Math.max(1, Math.round(Math.abs(wAll)))} % across the 6 windiest states.`, ids: wTop ? [wTop.id] : [], sub: 'Estimated from 10-day wind speeds, compared with the normal forecast.' }) },
-  ].sort((a, b) => b.score - a.score);
-  if (cands[0].score >= 0.3) { const o = cands[0].build(); return { kind: cands[0].kind, ...o, text: nb(o.text) }; }
-  return { kind: 'small', text: 'This change stays local. India’s rain, heat and wind barely move.', ids: [], sub: 'Over the next 10 days, compared with the normal forecast.' };
+/** Bars: strongest |effect| first, small ones summarised at the end. Shared by the side panel and the e2e test. */
+export function stateBars(K, n = 8) {
+  const rows = [...K.rows].sort((a, b) => Math.abs(rainVal(b)) - Math.abs(rainVal(a)) || (b.dRain - a.dRain));
+  const big = rows.filter((x) => (lowBase(x) ? Math.abs(dMm(x)) >= 0.5 : Math.abs(x.dRain) >= 2));
+  const shown = big.slice(0, n);
+  return { rows, shown, hidden: rows.length - shown.length };
 }
 
-/** The three figures (identical logic to v1's cards). */
+const word = (x) => (x < 0 ? 'drier' : 'wetter');
+/** Rain headline: leads with the state with the largest change on the bars, adds a second same-direction state and the
+ *  strongest opposite one. Each state carries its own bar value (fmtRain), no extra rounding. Returns {kind, text, ids, sub}. */
+export function headline(imp) {
+  const { rain } = imp;
+  if (!rain.length) return { kind: 'small', text: `No state’s 10-day rain changes by ${HEADLINE_PCT} % or more.`, ids: [], sub: 'Change in 10-day rain, compared with the normal forecast (states with almost no normal rain are left out).' };
+  const top = rain[0], same = rain.filter((r) => Math.sign(r.dRain) === Math.sign(top.dRain)).slice(0, 2), opp = rain.find((r) => Math.sign(r.dRain) !== Math.sign(top.dRain));
+  const grp = (rows) => joinNames(rows.map((r) => `${r.name} ${fmtRain(r)}`)) + ` (${word(rows[0].dRain)})`;
+  const text = `10-day rain: ${grp(same)}${opp ? '; ' + grp([opp]) : ''}.`;
+  return { kind: 'rain', text: nb(text), ids: [...same, ...(opp ? [opp] : [])].map((r) => r.id), sub: 'Change in 10-day rain, compared with the normal forecast.' };
+}
+
+/** The three figures. Rain card = the headline's lead state, same number. */
 export function figures(imp) {
   const { rain, heat, wAll, wTop, K } = imp, f = {};
   const dry = rain.filter((r) => r.dRain < 0).length, wet = rain.length - dry;
   if (rain.length) {
     const t = rain[0], parts = [];
     if (dry) parts.push(`${plural(dry, 'state')} drier`); if (wet) parts.push(`${plural(wet, 'state')} wetter`);
-    f.farm = { value: t.dRain, text: nb(sgn(t.dRain) + ' %'), where: t.name, id: t.id, line: `10-day rain in ${t.name}`, meaning: `${parts.join(', ')} by 10 % or more. ${K.worse ? plural(K.worse, 'state') + ' move into higher farm-stress risk.' : 'No state moves into higher farm-stress risk.'}` };
-  } else f.farm = { value: 0, text: '0\u00A0%', where: null, line: 'rain change anywhere above 10 %', meaning: K.worse ? `${plural(K.worse, 'state')} still move into higher farm-stress risk (heat).` : 'Sowing conditions stay about the same in every state.' };
-  const more = heat.filter((x) => x.d > 0), less = heat.filter((x) => x.d < 0);
-  if (more.length) f.heat = { value: more[0].d, text: '+' + more[0].d, line: `extra very hot ${more[0].d === 1 ? 'day' : 'days'} in ${more[0].r.name}`, meaning: `${plural(more.length, 'state')} get more days hotter than the usual hottest 5 % for the season.` };
-  else if (less.length) f.heat = { value: -Math.abs(less[0].d), text: '−' + Math.abs(less[0].d), line: `fewer very hot ${Math.abs(less[0].d) === 1 ? 'day' : 'days'} in ${less[0].r.name}`, meaning: `${plural(less.length, 'state')} get fewer unusually hot days.` };
-  else f.heat = { value: 0, text: '0', line: 'No extra very hot days in any state', meaning: 'No extra very hot days in any state.' };
-  f.wind = { value: wAll, text: nb(sgn(wAll, 1) + ' %'), line: 'wind-farm output', meaning: `Across the 6 windiest states. Biggest swing: ${wTop.name} (${sgn(wTop.dPct, 1)} %).` };
+    f.farm = { value: t.dRain, text: fmtRain(t), where: t.name, id: t.id, line: `10-day rain in ${t.name}`, meaning: `${parts.join(', ')} by ${HEADLINE_PCT} % or more.` };
+  } else f.farm = { value: 0, text: '0 %', where: null, id: null, muted: true, line: `No state changes by ${HEADLINE_PCT} % or more`, meaning: 'States with almost no normal rain are left out.' };
+  const top = heat[0];
+  if (top && Math.abs(top.d) >= HEAT_MIN_DAYS) {
+    const n = Math.abs(top.d), up = top.d > 0;
+    f.heat = { value: top.d, text: String(n), line: `${up ? 'more' : 'fewer'} very hot ${n === 1 ? 'day' : 'days'} in ${top.r.name}`, meaning: HEAT_DEF };
+  } else f.heat = { value: 0, text: '', muted: true, line: 'No notable change in very hot days', meaning: HEAT_DEF + ` Changes of less than ${HEAT_MIN_DAYS} days are not shown.` };
+  f.wind = { value: wAll, text: nb(sgn(wAll, 1) + ' %'), line: 'wind-farm output, 6 main wind-power states', meaning: `Average of Gujarat, Rajasthan, Tamil Nadu, Karnataka, Maharashtra and Andhra Pradesh. Biggest swing: ${wTop.name} (${sgn(wTop.dPct, 1)} %).` };
   return f;
+}
+
+// ---------- where is a grid cell (for "Strongest change on this map") ----------
+let CELL_STATE = null;
+export function whereIs(k, assets) {
+  if (!assets) return '';
+  if (!CELL_STATE) { CELL_STATE = new Map(); const best = new Map(); for (const [id, cells] of Object.entries(assets.grid.cells)) for (const [c, f] of cells) if (f > (best.get(c) || 0)) { best.set(c, f); CELL_STATE.set(c, id); } }
+  const id = CELL_STATE.get(k);
+  if (id && !SKIP.has(id)) return assets.grid.meta[id].name;
+  const la = 6 + Math.floor(k / 36) + 0.5, lo = 65 + (k % 36) + 0.5, at = `${la.toFixed(0)}\u00B0N ${lo.toFixed(0)}\u00B0E`;
+  if (la < 8) return `Indian Ocean (${at})`;
+  if (lo < 77.5 && la < 25) return `Arabian Sea (${at})`;
+  if (lo > 79.5 && lo < 99 && la < 22.5) return `Bay of Bengal (${at})`;
+  return `outside India (${at})`;
 }

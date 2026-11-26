@@ -3,7 +3,7 @@ import { signal, computed, batch } from '@preact/signals';
 import { Api } from '@lib/api.js';
 import { flatten, NCH, NCELL, NLAT, NLON, lat, lon, STD, rIdx, stepsOf } from '@lib/util.js';
 import { boxFromLatLon, buildPerturbation, ripple, maxAbsDiff } from '@lib/shock.js';
-import { SCENARIOS, CUSTOM_WHAT, REGIONS, computeImpact, headline, figures } from './lib/narrative.js';
+import { SCENARIOS, CUSTOM_WHAT, REGIONS, computeImpact, headline, figures, shownPct } from './lib/narrative.js';
 import { VARS, varIndex, bundleFields } from './lib/fields.js';
 import { kharif } from '@lib/impact.js';
 
@@ -40,6 +40,7 @@ export const introOpen = signal(true);
 export const tour = signal(null);                    // null | step index
 export const drawer = signal(null);                  // null | tab id
 export const customOpen = signal(false);
+export const customFresh = signal(false);           // builder opened since the last custom run: old result is hidden
 export const custom = signal({ what: 1, amt: CUSTOM_WHAT[1].def, where: 'raj' });
 export const drawBox = signal(null);
 export const hoverTip = signal(null);
@@ -59,6 +60,7 @@ const ENGINE_DOWN = "The forecast engine isn't running. Ask the presenter to sta
 export async function checkHealth() {
   const h = await api.health();
   health.value = h.ok ? 'ready' : h.status === 'loading' ? 'loading' : 'down';
+  if (!h.ok) nullTest.value = null; // a stopped model has not been tested
   if (h.ok) { if (error.value && error.value.engine) setError(null); }
   else if (!error.value || !error.value.engine) error.value = { msg: ENGINE_DOWN, details: `Tried ${api.url}. Start it with: python serve.py, then press Retry.`, engine: true };
   return h.ok;
@@ -72,7 +74,7 @@ export function retry(url) {
 export async function loadSample(file, auto) {
   const js = await (await fetch(BASE + 'samples/' + file)).json();
   const meta = samples.value.find((s) => s.file === file) || {};
-  playing.value = false; clearInterval(timer);
+  playing.value = false; clearTimeout(timer);
   batch(() => { sample.value = { file, name: js.name, date_label: meta.date_label || js.date_label, init: flatten(js.init_states), doy: js.doy_sincos.map(Number) }; bundle.value = null; result.value = null; day.value = 1; mode.value = 'normal'; nullTest.value = null; place.value = null; drawBox.value = null; });
   if (health.value !== 'ready') return;
   if (auto) return runWhatIf(typeof auto === 'string' ? SCENARIOS.find((s) => s.id === auto) : auto);
@@ -101,26 +103,31 @@ export async function runWhatIf(sc, opts = {}) {
     if (shk.roll.some((x) => !Number.isFinite(x))) throw new Error('The model returned invalid numbers for this what-if.');
     const imp = computeImpact(base.roll, shk.roll, assets.value, sm.doy), hl = headline(imp), figs = figures(imp), rip = ripple(base.roll, shk.roll, box);
     const b = { id: nextBundle++, prime: base.roll, mv: shk.roll, cache: {} };
-    const fk = { small: sc.focus, rain: 'tp', heat: 't2m', wind: 'wind' }[hl.kind], vi = varIndex(fk || sc.focus), F = bundleFields(b, vi);
-    const peak = F.D.map((f) => f.reduce((m, x) => Math.max(m, Math.abs(x)), 0)), pk = Math.max(2, peak.indexOf(Math.max(...peak)) + 1);
+    // The headline is about 10-day rain, so the plate shows rain, "Only the change", day 10 (the tour may change this in its own steps).
+    play(false);
     batch(() => {
-      bundle.value = b; speedMs.value = base.ms; varKey.value = VARS[vi].key; mode.value = 'diff'; day.value = opts.keepDay ? day.value : pk;
+      bundle.value = b; speedMs.value = base.ms; varKey.value = 'tp'; mode.value = 'diff'; day.value = opts.keepDay ? day.value : stepsOf(b.prime);
+      if (sc.id === 'custom') { customOpen.value = false; customFresh.value = false; }
       result.value = { id: b.id, sc, box, pert, imp, hl, figs, rip, ms: shk.ms, clamped, range: null };
       if (!opts.keepPlace) place.value = null; setError(null);
     });
     computeRange(id, b.id, sm, sc, pert, imp, figs);
     ensureNull();
+    if (sc.id === 'custom' && !opts.quiet) setTimeout(() => { const el = document.querySelector('[data-tour="result"]'); el && el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 60);
   } catch (e) { setError(e.message.includes('invalid') ? e.message : ENGINE_DOWN, e.message); } finally { busyOff(); pending.value = null; }
 }
-/** Sensitivity: rerun at 0.5x and 1.5x strength, report the range of the headline state's rain change. Cheap (2 calls). */
+/** Size range: the same change at 0.5x, 1x and 1.5x strength. Reports min/max over all three (so lo <= main <= hi) of the
+ *  rain card's state, in the card's own rounding; flags "very uncertain" when the three runs are not in order. Cheap (2 calls). */
 async function computeRange(id, bid, sm, sc, pert, imp, figs) {
+  if (!figs.farm.id) return;
   try {
     const rs = await Promise.all([0.5, 1.5].map((f) => api.run(sm.init, sm.doy, scaled(pert, f))));
     if (!result.value || result.value.id !== bid) return;
-    const pick = (roll) => { const K = kharif(bundle.value.prime, roll, assets.value, sm.doy), row = K.rows.find((r) => r.id === figs.farm.id); return row ? row.dRain : null; };
-    const vals = figs.farm.id ? rs.map((r) => pick(r.roll)).filter((v) => v != null) : [];
-    const heat = rs.map((r) => { const K = kharif(bundle.value.prime, r.roll, assets.value, sm.doy); return K.rows.reduce((m, row) => Math.max(m, row.m.heat - row.p.heat), 0); });
-    result.value = { ...result.value, range: vals.length === 2 ? { lo: Math.min(...vals), hi: Math.max(...vals) } : null };
+    const pick = (roll) => { const K = kharif(bundle.value.prime, roll, assets.value, sm.doy), row = K.rows.find((r) => r.id === figs.farm.id); return row ? shownPct(row.dRain) : null; };
+    const [a, c] = rs.map((r) => pick(r.roll)), m = shownPct(figs.farm.value);
+    if (a == null || c == null) return;
+    const all = [a, m, c], ordered = (a <= m && m <= c) || (a >= m && m >= c);
+    result.value = { ...result.value, range: { lo: Math.min(...all), hi: Math.max(...all), main: m, half: a, onehalf: c, ordered } };
   } catch (e) { /* the range is a bonus; ignore */ }
 }
 
@@ -147,8 +154,10 @@ function ensureNull() { if (!nullTest.value) runNull(); }
 
 // ---------- playback ----------
 export function play(on) {
-  playing.value = on; clearInterval(timer);
-  if (on) timer = setInterval(() => setDay(day.value >= 10 ? 1 : day.value + 1), 800);
+  if (on && !bundle.value) return;
+  playing.value = on; clearTimeout(timer);
+  const tick = () => { if (!playing.value) return; const last = day.value >= 10; setDay(last ? 1 : day.value + 1); timer = setTimeout(tick, day.value >= 10 ? 1500 : 800); };
+  if (on) timer = setTimeout(tick, 800);
 }
 export function setDay(d) { day.value = Math.max(1, Math.min(stepsOf(bundle.value ? bundle.value.prime : new Float32Array(10 * NCH * NCELL)), d)); }
 export function setMode(m) { if (m === 'normal' || (result.value && bundle.value && bundle.value.mv)) mode.value = m; }
