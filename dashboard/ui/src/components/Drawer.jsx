@@ -13,7 +13,7 @@ function StateTable({ r }) {
   return (
     <table class="tbl"><caption>Rain and heat by state, 10 days. Departures are measured against the normal forecast.</caption>
       <thead><tr><th>State</th><th class="n">Rain, normal (mm)</th><th class="n">Rain, what-if (mm)</th><th class="n">Change</th><th>Band (IMD)</th><th class="n">Very hot days, normal</th><th class="n">What-if</th><th class="n">Farm stress</th></tr></thead>
-      <tbody>{rows.map((x) => <tr key={x.id} class={Math.abs(x.dRain) >= 10 ? 'big' : ''}><td>{x.name}</td><td class="n">{x.p.total.toFixed(0)}</td><td class="n">{x.m.total.toFixed(0)}</td><td class="n">{sgn(x.dRain, 1)} %</td><td><span class={'tick ' + x.band.key}>{x.band.label}</span></td><td class="n">{x.p.heat}</td><td class="n">{x.m.heat}</td><td class="n"><i class={'sq s' + x.m.stress.toFixed(0)} />{x.p.stress.toFixed(1)} &rarr; {x.m.stress.toFixed(1)}</td></tr>)}</tbody>
+      <tbody>{rows.map((x) => <tr key={x.id} class={Math.abs(x.dRain) >= 10 ? 'notable' : ''}><td>{x.name}</td><td class="n">{x.p.total.toFixed(0)}</td><td class="n">{x.m.total.toFixed(0)}</td><td class="n">{sgn(x.dRain, 1)} %</td><td><span class={'tick ' + x.band.key}>{x.band.label}</span></td><td class="n">{x.p.heat}</td><td class="n">{x.m.heat}</td><td class="n"><i class={'sq s' + x.m.stress.toFixed(0)} />{x.p.stress.toFixed(1)} &rarr; {x.m.stress.toFixed(1)}</td></tr>)}</tbody>
     </table>);
 }
 function WindTable({ r }) {

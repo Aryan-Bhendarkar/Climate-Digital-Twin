@@ -114,7 +114,7 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 .side-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 0.75rem; color: var(--ink2); margin-top: 8px; }
 .states ul { list-style: none; margin: 0; padding: 0; }
 .states li { padding: 3px 0 4px; border-radius: 2px; } .states li:hover, .states li.hl { background: var(--tur-tint); }
-.states li.noise { opacity: .55; } .states li.gap { font-size: 11px; color: var(--ink3); text-align: center; padding: 2px 0; }
+.states li.noise .track { opacity: .45; } .states li.noise .st-top { color: var(--ink3); } .states li.gap { font-size: 11px; color: var(--ink3); text-align: center; padding: 2px 0; }
 .st-top { display: flex; justify-content: space-between; font-size: 0.8125rem; padding: 0 2px; } .st-top b { font-weight: 600; }
 .track { position: relative; height: 8px; margin: 2px 2px 0; }
 .track .zero { position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px; background: var(--rule); }
@@ -179,7 +179,7 @@ select { width: 100%; padding: 7px 28px 7px 10px; border: 1px solid var(--rule);
 @keyframes fade { from { opacity: 0; } } @keyframes slide { from { transform: translateX(24px); opacity: 0; } }
 .tbl { width: 100%; border-collapse: collapse; font-size: 0.8125rem; } .tbl caption { text-align: left; font-size: 0.75rem; color: var(--ink2); padding-bottom: 8px; }
 .tbl th { position: sticky; top: -14px; background: var(--paper); text-align: left; font-size: 0.75rem; font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--rule); } .tbl td { padding: 5px 8px; border-bottom: 1px solid var(--hair); }
-.tbl .n { text-align: right; } .tbl tbody tr:hover { background: var(--hover); } .tbl tr.big td:first-child { font-weight: 600; }
+.tbl .n { text-align: right; } .tbl tbody tr:hover { background: var(--hover); } .tbl tr.notable td:first-child { font-weight: 600; }
 .tick { border-left: 3px solid var(--rule); padding-left: 6px; } .tick.excess { border-color: var(--pos); } .tick.deficient, .tick.scanty { border-color: var(--neg); }
 .sq { display: inline-block; width: 10px; height: 10px; margin-right: 6px; background: var(--hair); } .sq.s1 { background: #F1A340; } .sq.s2 { background: #D8812A; } .sq.s3 { background: #B35806; }
 

@@ -14,20 +14,22 @@ function States() {
   const r = S.result.value, [all, setAll] = useState(false);
   if (!r) return <p class="side-empty">Pick a what-if and the states that get drier or wetter appear here.</p>;
   const rows = [...r.imp.K.rows].sort((a, b) => b.dRain - a.dRain), max = Math.max(10, ...rows.map((x) => Math.abs(x.dRain)));
-  const show = all || rows.length <= 12 ? rows : [...rows.slice(0, 5), null, ...rows.slice(-5)];
+  const big = rows.filter((x) => Math.abs(x.dRain) >= 2), wet = big.filter((x) => x.dRain > 0).slice(0, 5), dry = big.filter((x) => x.dRain < 0).slice(-5), hidden = rows.length - wet.length - dry.length;
+  const show = all ? rows : [...wet, ...(hidden > 0 && (wet.length || dry.length) ? [null] : []), ...dry];
+  if (!all && !show.length) return <p class="side-empty">No state&rsquo;s rain moves by more than 2 %.</p>;
   const hl = new Set(r.hl.ids);
   return (
     <div class="states">
       <p class="side-cap">10-day rain change, state by state</p>
       <ul role="list">
-        {show.map((x, n) => x === null ? <li key="gap" class="gap">{rows.length - 10} more states between</li> : (
+        {show.map((x, n) => x === null ? <li key="gap" class="gap">{hidden} more states change less</li> : (
           <li key={x.id} class={(hl.has(x.id) ? 'hl ' : '') + (Math.abs(x.dRain) < 5 ? 'noise' : '')} onMouseEnter={() => (S.pickState.value = x.id)} onMouseLeave={() => (S.pickState.value = null)} onFocus={() => (S.pickState.value = x.id)} onBlur={() => (S.pickState.value = null)} tabIndex={0}>
             <div class="st-top"><span>{x.name}</span><b>{sgn(x.dRain, Math.abs(x.dRain) < 10 ? 1 : 0)} %</b></div>
             <div class="track" aria-hidden="true"><i class="zero" /><i class={'bar ' + (x.dRain < 0 ? 'neg' : 'pos')} style={{ width: Math.min(50, (Math.abs(x.dRain) / max) * 50) + '%', [x.dRain < 0 ? 'right' : 'left']: '50%' }} /></div>
           </li>))}
       </ul>
       <div class="side-foot"><span><i class="sw neg" />drier</span><span><i class="sw pos" />wetter</span><span class="muted">faint = within noise</span>
-        {rows.length > 12 && <button class="link" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${rows.length}`}</button>}</div>
+        {rows.length > show.length && <button class="link" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${rows.length}`}</button>}</div>
     </div>
   );
 }

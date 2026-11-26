@@ -91,3 +91,11 @@ build_assets.py   offline asset builder (not part of the server)
   clipped to lon 65–101 / lat 6–38 and simplified. Boundaries are **indicative only** and carry no legal standing.
 * Sample inputs, heat/rain climate statistics: the competition training set (2005–2021), via `build_assets.py`
   (`python build_assets.py --ne <natural-earth-geojson-dir> --nc <india_climate_train.nc>`; needs shapely + xarray; run once, outputs are committed).
+
+## UI v3 "Survey Plate" (default) and v1
+
+`index.html` now routes to the v3 build in `v2/` (committed output; judges only need Python). The original Story/Expert UI stays at
+`index.html?ui=v1` (and `?view=expert`). Sources are in `ui/` (Vite + Preact + signals; `cd ui && npm ci && npm run build` writes `v2/`).
+The pure logic modules in `js/` (api, util, impact, shock) are shared by both UIs, so the numbers are identical.
+URL options for v3: `?server=api`, `?tour=1`, `?scenario=<id>`, `?auto=none`. Tour scenarios: one constant, `TOUR_SCENARIOS` in `ui/src/tour.js`.
+Tests (live model through this server): `python3 tests/dashboard_ui/e2e.py` (needs Playwright; axe-core from `ui/node_modules`).

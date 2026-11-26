@@ -50,7 +50,7 @@ export function MapCanvas() {
       const roll = (x) => ({ u: Float32Array.from({ length: NCELL }, (_, k) => x[rIdx(d, 2) + k]), v: Float32Array.from({ length: NCELL }, (_, k) => x[rIdx(d, 3) + k]) });
       if (md === 'diff') { const a = roll(b.prime), c = roll(b.mv); props.arrows = { u: c.u.map((x, k) => x - a.u[k]), v: c.v.map((x, k) => x - a.v[k]) }; } else props.arrows = roll(md === 'whatif' ? b.mv : b.prime);
     }
-    const ps = S.pickState.value; if (r && !cu) { props.highlight = ps ? [...new Set([...r.hl.ids, ps])] : r.hl.ids; props.hlLabels = props.highlight.map((id) => ({ id, text: S.assets.value.grid.meta[id].name })); }
+    const ps = S.pickState.value; if (r && !cu) { props.highlight = ps ? [...new Set([...r.hl.ids, ps])] : r.hl.ids; props.hlLabels = props.highlight.slice(0, 2).map((id) => ({ id, text: S.assets.value.grid.meta[id].name })); }
     const key = `${b.id}|${vi}|${md}`, A = anim.current;
     if (A.last && A.lastKey === key && A.last !== bm && !reduced()) { // day change: crossfade
       cancelAnimationFrame(A.raf); const prev = A.last, t0 = performance.now();
@@ -88,8 +88,8 @@ export function MapCanvas() {
   };
   const desc = useMemo(() => '', []);
   return (
-    <div class="map-box" data-tour="map">
-      <canvas ref={cvRef} role="img" aria-label="Map of India showing the forecast. Click a city or any spot to see its 10-day series." onMouseMove={onMove} onMouseLeave={() => (S.hoverTip.value = null)} onMouseDown={onDown} onClick={onClick} class={S.customOpen.value ? 'draw' : ''} />
+    <div class="map-box">
+      <canvas data-tour="map" ref={cvRef} role="img" aria-label="Map of India showing the forecast. Click a city or any spot to see its 10-day series." onMouseMove={onMove} onMouseLeave={() => (S.hoverTip.value = null)} onMouseDown={onDown} onClick={onClick} class={S.customOpen.value ? 'draw' : ''} />
       {S.busy.value > 0 && S.bundle.value && <div class="busy-veil" role="status"><span class="spin" />{S.busyText.value}</div>}
     </div>
   );
