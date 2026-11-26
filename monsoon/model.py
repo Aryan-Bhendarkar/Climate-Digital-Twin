@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import math
 
+from concurrent.futures import ThreadPoolExecutor
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -174,6 +176,11 @@ class Emulator(nn.Module):
         return self.z_to_phys(z)
 
 
+def _run_member(m, init_states, doy_sincos, steps):
+    with torch.inference_mode():
+        return m.simulate(init_states, doy_sincos, steps)
+
+
 class EnsembleEmulator(nn.Module):
     """Average of several independently trained Emulators (different random seeds).
 
@@ -184,6 +191,7 @@ class EnsembleEmulator(nn.Module):
         super().__init__()
         self.members = nn.ModuleList(members)
         self.arch = f"{members[0].arch}-x{len(members)}"
+        self._pool = None
 
     @property
     def clim_coef(self):
@@ -191,7 +199,11 @@ class EnsembleEmulator(nn.Module):
 
     @torch.no_grad()
     def simulate(self, init_states: torch.Tensor, doy_sincos: torch.Tensor, steps: int) -> torch.Tensor:
-        return torch.stack([m.simulate(init_states, doy_sincos, steps) for m in self.members]).mean(0)
+        # members are independent: run them on separate cores (each single-threaded), then average
+        if self._pool is None:
+            self._pool = ThreadPoolExecutor(max_workers=len(self.members))
+        outs = list(self._pool.map(lambda m: _run_member(m, init_states, doy_sincos, steps), self.members))
+        return torch.stack(outs).mean(0)
 
 
 def _build(ck) -> "Emulator":
