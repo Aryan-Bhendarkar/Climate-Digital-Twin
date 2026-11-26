@@ -8,3 +8,4 @@ weights/val*.pt
 .venv/
 venv/
 *.log
+node_modules

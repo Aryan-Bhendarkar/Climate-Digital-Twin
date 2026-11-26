@@ -17,7 +17,7 @@ export function TrustStrip() {
           ? <><span class="t-ok"><Icon name="check" size={14} /> Identical forecast</span> when nothing is changed (checked at {hhmm(n.at)}). </> : <span class="t-bad">Forecasts differ by up to {n.m.toExponential(1)}. </span>}
         {up && <button class="link" onClick={S.runNull} disabled={n && n.state === 'running'}>Run again</button>}
       </p>
-      <p><span class="t-num">{SKILL_DAY1_PCT}&nbsp;%</span> lower error than &ldquo;tomorrow = today&rdquo; on day 1, on 2019&ndash;21 (years held out from training).{SKILL_DAY10_TEXT ? ' ' + SKILL_DAY10_TEXT : ''}</p>
+      <p><span class="t-num">{SKILL_DAY1_PCT}&nbsp;%</span> lower error than &ldquo;tomorrow = today&rdquo; on day 1{SKILL_DAY10_TEXT ? ' ' + SKILL_DAY10_TEXT : ''}, tested on 2019&ndash;21 with a copy trained only on 2005&ndash;18.</p>
     </footer>
   );
 }
