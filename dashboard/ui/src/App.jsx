@@ -14,21 +14,25 @@ function Mark() { return <svg class="mark" viewBox="0 0 24 24" width="22" height
 function Header() {
   const h = S.health.value, ms = S.speedMs.value, [ext, setExt] = useState(0);
   useEffect(() => { const f = () => { const o = location.origin; let so = ''; try { so = new URL(S.api.url).origin; } catch (e) { /* ignore */ } setExt(performance.getEntriesByType('resource').filter((r) => { try { const x = new URL(r.name).origin; return x !== o && x !== so && !r.name.startsWith('data:'); } catch (e) { return false; } }).length); }; f(); const t = setInterval(f, 3000); return () => clearInterval(t); }, []);
-  const label = h === 'ready' ? 'Model running' : h === 'loading' ? 'Model loading' : h === 'down' ? 'Model not running' : 'Connecting';
+  const label = h === 'ready' ? 'Model running' : h === 'loading' ? 'Model loading' : h === 'down' ? 'Model not running \u2014 start serve.py' : 'Connecting';
   return (
     <header class="top">
       <div class="brand"><Mark /><h1>Monsoon Multiverse</h1></div>
       <div class="status" role="status" title={ext ? `${ext} request(s) left this computer` : 'Verified live: no request has left this computer. The model runs here, with no internet.'}>
-        <i class={'dot ' + (h === 'ready' && !ext ? 'ok' : h === 'down' || ext ? 'bad' : 'warm')} />
-        <span>{ext ? `${ext} outside request(s)` : 'Works offline'}</span><span class="sep" /><span>{label}</span>
-        {ms ? <><span class="sep" /><span>{(Math.max(ms, 50) / 1000).toFixed(1)} s per forecast</span></> : null}
+        <i class={'dot ' + (ext ? 'bad' : h === 'ready' ? 'ok' : h === 'down' ? 'off' : 'warm')} />
+        {ext ? <><span>{ext} outside request(s)</span><span class="sep" /></> : h === 'ready' ? <><span>No internet needed</span><span class="sep" /></> : null}<span>{label}</span>
+        {ms && h === 'ready' ? <><span class="sep" /><span>{(Math.max(ms, 50) / 1000).toFixed(1)} s per forecast</span></> : null}
       </div>
       <div class="top-btns"><button class="btn" onClick={startTour} data-tour-btn>Start tour</button><button class="btn" onClick={() => (S.drawer.value = S.drawer.value ? null : 'states')}>Expert view</button></div>
     </header>
   );
 }
 function Hero() {
-  if (!S.introOpen.value) return null;
+  if (!S.introOpen.value) return (
+    <section class="hero closed" aria-label="About">
+      <p class="hero-sentence small">Change the weather in one corner of India. Watch the next 10 days change everywhere else.</p>
+      <div class="hero-btns"><button class="link" onClick={startTour}>Take the 1-minute tour</button></div>
+    </section>);
   return (
     <section class="hero" data-tour="hero">
       <p class="hero-sentence">Change the weather in one corner of India. Watch the next 10 days change everywhere else.</p>
