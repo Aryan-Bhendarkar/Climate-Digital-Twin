@@ -58,8 +58,12 @@ function busyOff() { busy.value = Math.max(0, busy.value - 1); }
 export function setError(msg, details) { error.value = msg ? { msg, details: details || '' } : null; }
 const ENGINE_DOWN = "The forecast engine isn't running. Ask the presenter to start it.";
 
+let healthFails = 0;
 export async function checkHealth() {
   const h = await api.health();
+  // a busy server can miss one poll; only call it down after two misses in a row
+  if (!h.ok && health.value === 'ready' && ++healthFails < 2) return true;
+  if (h.ok) healthFails = 0;
   health.value = h.ok ? 'ready' : h.status === 'loading' ? 'loading' : 'down';
   if (!h.ok) nullTest.value = null; // a stopped model has not been tested
   if (h.ok) { if (error.value && error.value.engine) setError(null); }

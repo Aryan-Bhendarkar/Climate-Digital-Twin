@@ -4,7 +4,7 @@ import { flatten, nest3, NCELL, NCH } from './util.js';
 export class Api {
   constructor(url) { this.url = url; }
   set base(u) { this.url = u.replace(/\/+$/, ''); }
-  async health(timeoutMs = 2500) {
+  async health(timeoutMs = 8000) {
     const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), timeoutMs);
     try {
       const r = await fetch(`${this.url}/health`, { method: 'POST', signal: ctl.signal });
