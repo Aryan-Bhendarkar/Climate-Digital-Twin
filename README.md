@@ -13,7 +13,8 @@ repo/
 ├── tools/model_adapter.py# in-process adapter used by our evaluation scripts
 ├── weights/emulator.pt   # trained weights (plain ~18 MB file, 3 seed members); includes normalisation, climatology + calibration
 ├── dashboard/            # offline web dashboard + impact module (separate from the server)
-└── TRAINING.md           # runbook: train, evaluate, serve
+├── TRAINING.md           # runbook: train, evaluate, serve
+└── docs/Monsoon_Multiverse_Brief.pdf  # the 2-page project brief
 ```
 
 ## Quick start (offline)
