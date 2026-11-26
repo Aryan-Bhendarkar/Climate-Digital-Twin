@@ -9,8 +9,9 @@ repo/
 ├── monsoon/model.py      # the emulator (network + climatology + rollout); only module the server imports
 ├── training/train.py     # training pipeline (1-step, then unrolled multi-day curriculum)
 ├── training/calibrate.py # per-lead output calibration (fit on training years)
+├── training/make_ensemble.py # packs calibrated seed runs into one weights file
 ├── tools/model_adapter.py# in-process adapter used by our evaluation scripts
-├── weights/emulator.pt   # trained weights (plain 1.7 MB file); includes normalisation, climatology + calibration
+├── weights/emulator.pt   # trained weights (plain ~12 MB file, 2 seed members); includes normalisation, climatology + calibration
 ├── dashboard/            # offline web dashboard + impact module (separate from the server)
 └── TRAINING.md           # runbook: train, evaluate, serve
 ```
@@ -22,7 +23,7 @@ python serve.py --port 8000                     # listens on 0.0.0.0; /health is
 # dashboard (second terminal): serves the page and forwards /api/* to the model server on one port
 cd dashboard && python devserver.py             # open http://127.0.0.1:8080/?server=api
 ```
-`/simulate` takes `{"init_states":[3,6,32,36], "doy_sincos":[sin,cos], "steps":10, "perturbation":null|[6,32,36]}` in physical units. It returns `{"rollout":[steps,6,32,36], "inference_ms":...}`. A 10-day rollout takes about 0.1–0.3 s on a single CPU core (the server is single-threaded on purpose).
+`/simulate` takes `{"init_states":[3,6,32,36], "doy_sincos":[sin,cos], "steps":10, "perturbation":null|[6,32,36]}` in physical units. It returns `{"rollout":[steps,6,32,36], "inference_ms":...}`. A 10-day rollout takes about 0.5–0.7 s on a single CPU core (two ensemble members; the server is single-threaded on purpose).
 
 ## How the model works
 | Piece | Choice | Why |
@@ -30,12 +31,13 @@ cd dashboard && python devserver.py             # open http://127.0.0.1:8080/?se
 | State | Anomaly from a smooth seasonal climatology (3 Fourier harmonics per grid cell and variable, fitted on training years, stored as model weights) | The net learns *weather*, not the calendar. At long leads it relaxes toward a sensible seasonal state instead of drifting. There is no per-day lookup table. |
 | Rain | Modelled in `log1p` space | Heavy-tailed rain becomes learnable. Output guards keep rain ≥ 0, water vapour ≥ 0 and temperature in physical bounds. |
 | Step | Predicts the 1-day **tendency** (residual) | The identity path keeps fine structure, which fights blur, and a shock's day-1 response starts exactly where it was applied. |
-| Network | 8 residual blocks, each with exactly **one 3×3 convolution** and per-cell normalisation (~0.37 M parameters) | Receptive field = **8 grid cells (~900 km) per simulated day**: a hard upper bound by construction, so a shock can never jump across the map (measured response beyond that radius: exactly 0). Real responses spread more slowly. There is no global attention, FFT or batch-wide statistic. |
+| Network | 8 residual blocks (width 96), each with exactly **one 3×3 convolution** and per-cell normalisation (~1.5 M parameters per member) | Receptive field = **8 grid cells (~900 km) per simulated day**: a hard upper bound by construction, so a shock can never jump across the map (measured response beyond that radius: exactly 0). Real responses spread more slowly. There is no global attention, FFT or batch-wide statistic. |
 | Inputs | Anomalies of the last 3 days, target-day seasonal signal, land–sea mask, orography, day-of-year, lat/lon | Static geography lets the net learn the Western Ghats, the Himalaya and the coastlines. |
-| Training | 1-step, then **unrolled 2 → 4 → 8-day** rollouts with full back-propagation, EMA weights | The model is trained on its own forecasts, so it learns to correct its errors instead of compounding them (anti-drift). |
+| Training | 1-step, then **unrolled 2 → 4-day** rollouts with full back-propagation, EMA weights | The model is trained on its own forecasts, so it learns to correct its errors instead of compounding them (anti-drift). Going on to 8–10-day rollouts fit the training years better but scored worse on held-out years, so we stop at 4. |
 | Calibration | One least-squares gain per lead and variable on the output anomaly (~50 numbers, fit on training years). Rain is not scaled. | Long leads shrink toward the seasonal climate exactly as much as the training data supports (like MOS post-processing). |
 | Loss | Latitude-weighted MSE per variable and lead, **divided by the error of the best reference** (persistence or climatology), ×2 at days 1/4/8, heavy-rain (>10 mm/day) cells up-weighted | Optimises exactly what matters: beating "repeat yesterday" and climatology, including heavy rain. |
 | Robustness | Random ±0.7 K temperature offsets during training | 2023–24 is warmer than the 2005–2021 training period. |
+| Ensemble | Two copies of the same recipe trained with different random seeds; the server averages their forecasts | Averaging cancels part of each copy's own errors: on held-out years it scored ~+5 points over the best single copy. Both copies are local and deterministic, so the average is too. |
 | Determinism | No dropout or noise at inference, deterministic kernels | A zero shock returns a bit-identical forecast. |
 
 ## Evaluation (held-out 2019–2021)
@@ -43,23 +45,27 @@ cd dashboard && python devserver.py             # open http://127.0.0.1:8080/?se
 
 Skill = 1 − RMSE / RMSE of the better reference (persistence or day-of-year climatology), chosen **per lead day** (the strict reading), latitude-weighted, mean of 6 variables, 217 windows (every 5th day of 2019–21):
 
-| Lead | Skill vs best reference | Heavy-rain (>10 mm/day) CSI: ours / best reference |
-|---|---|---|
-| Day 1 | **+0.24** | 0.51 / 0.42 |
-| Day 4 | **+0.06** | 0.34 / 0.27 |
-| Day 8 | −0.01 (tie with climatology) | 0.31 / 0.27 |
+| Lead | Skill vs best reference |
+|---|---|
+| Day 1 | **+0.36** (also +0.36 vs persistence) |
+| Day 4 | **+0.12** (+0.28 vs persistence) |
+| Day 8 | +0.02 (about level with climatology; +0.27 vs persistence) |
 
-- Day-8 spatial variance stays at 0.46–1.0 of the truth per variable, against an anti-blur gate of ≥ 0.40.
-- Null shock: bit-identical forecast. Day-1 shock response: 99.5–100 % within 3 cells of the shocked box.
-- Our grader totals, out of 70 (automated forecast + blur + causality parts): about 54 on the strict reading, 66–68 on the lenient one. How the official grader combines lead days is not published, so we optimised for the stricter reading.
+- Heavy-rain (>10 mm/day) CSI, mean over the scored leads: 0.29, against 0.19 for persistence and 0.16 for climatology.
+- Day-8 spatial variance stays at 0.55–1.03 of the truth per variable, against an anti-blur gate of ≥ 0.40.
+- Null shock: bit-identical forecast. Day-1 shock response: ≥ 99 % within 3 cells of the shocked box.
+- Our grader totals, out of 70 (automated forecast + blur + causality parts): about 60–64 on the strict reading, about 68 on the lenient one (a single copy: about 57–59 strict). How the official grader combines lead days is not published, so we optimised for the stricter reading.
 
 **Reproduce the submitted weights:**
 ```bash
-python training/train.py --data ../data/india_climate_train.nc --train-end 2021 --width 48 --depth 8 \
-    --stages 1:20,2:5,4:5,8:4 --lrs 1e-3,3e-4,2e-4,1e-4 --steps-per-epoch 100 --batch 16 --seed 0 --out weights/emulator.pt
-python training/calibrate.py --ckpt weights/emulator.pt --data ../data/india_climate_train.nc --train-end 2021 --stride 4
+for s in 0 1; do
+  python training/train.py --data ../data/india_climate_train.nc --train-end 2021 --width 96 --depth 8 \
+      --stages 1:40,2:10,4:10 --lrs 1e-3,3e-4,2e-4 --seed $s --out runs/seed$s.pt --device cuda
+  python training/calibrate.py --ckpt runs/seed$s.pt --data ../data/india_climate_train.nc --train-end 2021 --stride 4
+done
+python training/make_ensemble.py --out weights/emulator.pt runs/seed0.pt runs/seed1.pt
 ```
-That takes about 1 hour on a 2-core CPU, or minutes on a GPU. Use `--train-end 2018` for the validation model.
+Each seed takes about 45 min on one T4 GPU (about 75 min on a 4 GB laptop GPU). Use `--train-end 2018` for the validation model.
 
 ## Impact module (dashboard)
 **Kharif Stress Monitor.** Per state, comparing Prime vs Multiverse:
@@ -73,7 +79,7 @@ There is also a **wind-power index** for the six major wind states (10 m wind �
 ## Limitations (honest)
 - 1° daily grid, 6 surface variables: no SST, no upper air, no boundary inflow from outside the box. The edges are the least reliable.
 - Day 8–10 forecasts are about as good as climatology. The weather part of the forecast is deliberately damped there, so the map keeps its seasonal structure but little day-to-day detail.
-- Rain is the hardest variable. Heavy-rain cores are often 1–2 cells off. A strong ocean-warming shock can trigger a large local rain response (> 5 σ in ~5 % of start dates).
+- Rain is the hardest variable. Heavy-rain cores are often 1–2 cells off. A strong ocean-warming shock can trigger a large local rain response (> 5 σ in ~6 % of start dates).
 - Shock responses are learned statistical associations, not a physics solver: there is no water or energy conservation. The **direction** of a response is more robust than its size (two trainings of the same recipe agree in sign but can differ ~3× in magnitude). Wind-only shocks fade within ~3 days. A shock far beyond the 2005–2021 range is extrapolation.
 - The impact indicators are scenario-comparison tools on a 1° grid, not validated agricultural advisories.
 - State boundaries in the dashboard are Natural Earth (public domain), indicative only.
