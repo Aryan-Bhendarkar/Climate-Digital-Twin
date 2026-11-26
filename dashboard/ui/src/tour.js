@@ -1,15 +1,17 @@
 // Guided tour: declarative steps that drive the store. Esc exits; the tour never blocks the judge's input.
 // Step copy that mentions a result is read from the LIVE result (headline, region), never hard-coded.
 import * as S from './store.js';
-import { SCENARIOS, CUSTOM_WHAT, REGIONS, DATE_WORDS, nb } from './lib/narrative.js';
+import { SCENARIOS, CUSTOM_WHAT, REGIONS, DATE_WORDS, LANDING, nb } from './lib/narrative.js';
 
 // ONE place for the tour's scenarios AND their copy. `scenario` is an id from lib/narrative.js SCENARIOS (its `lead` and
 // `area` are used in the copy); `custom` presets the Draw-your-own form for the last step (what = CUSTOM_WHAT id, where = REGIONS id).
-// Re-check on the final model that each one reads sensibly (the step text quotes the live headline).
+// Picked from the final-model sweep of every date x preset (research/final_scenarios.md): only physically plausible combos
+// with a clear effect and an ordered size range. Avoid live: 'weak' (no clear effect on 4 of 5 dates), 'bob' on the onset and
+// heatwave dates and 'lowp' on the heatwave and Amphan dates (wrong sign). Step 7 was re-run as a custom what-if too (WB/Jharkhand wetter, range in order).
 export const TOUR_SCENARIOS = [
-  { file: 'onset.json', scenario: 'dry' },                                   // steps 1-4
-  { file: 'heavy_rain.json', scenario: 'arab' },                             // step 5: another day, another question
-  { file: 'cyclone.json', custom: { what: 't2m', amt: 3, where: 'bob' } },   // step 7: your turn (form preset, nothing run)
+  LANDING,                                                                       // steps 1-4: Rajasthan drier -> Haryana/Punjab drier
+  { file: 'heavy_rain.json', scenario: 'arab' },                                 // step 5: warmer Arabian Sea -> Kerala wetter
+  { file: 'heavy_rain.json', custom: { what: 'tcwv', amt: 30, where: 'bob' } },  // step 7: your turn (form preset, nothing run)
 ];
 const [T1, T2, T3] = TOUR_SCENARIOS;
 const scOf = (t) => SCENARIOS.find((s) => s.id === t.scenario);

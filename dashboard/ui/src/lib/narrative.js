@@ -24,6 +24,9 @@ export const SCENARIOS = [
   { id: 'lowp', icon: 'gauge', title: 'What if pressure over Bengal drops 5 hPa?', lead: 'pressure over Bengal drops 5 hPa', area: 'Bengal',
     box: [20, 26, 85, 92], comps: [{ ch: 4, mode: 'abs', value: -5 }], what: 'pressure −5 hPa', focus: 'msl' },
 ];
+// What a judge sees on first load (and tour steps 1-4). Chosen from the final-model sweep of every date x preset
+// (research/final_scenarios.md): physically plausible, clear effect, size range in order. Re-check if the weights change.
+export const LANDING = { file: 'onset.json', scenario: 'dry' };
 export const CUSTOM_WHAT = [
   { id: 't2m', label: 'Temperature', min: -5, max: 5, step: 0.5, def: 2, fmtv: (v) => `${sgn(v, 1)} °C`, build: (v) => [{ ch: 0, mode: 'abs', value: v }], text: (v) => `temperature ${sgn(v, 1)} °C`, focus: 't2m' },
   { id: 'tcwv', label: 'Moisture in the air', min: -50, max: 50, step: 5, def: -30, fmtv: (v) => `${sgn(v)} %`, build: (v) => [{ ch: 5, mode: 'pct', value: v }], text: (v) => `moisture ${sgn(v)} %`, focus: 'tp' },

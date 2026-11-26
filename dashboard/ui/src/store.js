@@ -3,7 +3,7 @@ import { signal, computed, batch } from '@preact/signals';
 import { Api } from '@lib/api.js';
 import { flatten, NCH, NCELL, NLAT, NLON, lat, lon, STD, rIdx, stepsOf } from '@lib/util.js';
 import { boxFromLatLon, buildPerturbation, ripple, maxAbsDiff } from '@lib/shock.js';
-import { SCENARIOS, CUSTOM_WHAT, REGIONS, computeImpact, headline, figures, shownPct } from './lib/narrative.js';
+import { SCENARIOS, CUSTOM_WHAT, REGIONS, LANDING, computeImpact, headline, figures, shownPct } from './lib/narrative.js';
 import { VARS, varIndex, bundleFields } from './lib/fields.js';
 import { kharif } from '@lib/impact.js';
 
@@ -166,10 +166,10 @@ export function setMode(m) { if (m === 'normal' || (result.value && bundle.value
 export async function boot() {
   const [o, grid, heat, rainClim, idx] = await Promise.all(['assets/outlines.json', 'assets/grid_states.json', 'assets/heat_p95.json', 'assets/rain_clim.json', 'samples/index.json'].map((u) => fetch(BASE + u).then((r) => r.json())));
   batch(() => { outlines.value = o; assets.value = { grid, heat, rainClim }; samples.value = idx; });
-  const pdate = params.get('date'), file = (pdate && idx.find((s) => s.file === pdate + '.json') ? pdate + '.json' : idx[0].file);
+  const pdate = params.get('date'), has = (f) => idx.some((s) => s.file === f), file = pdate && has(pdate + '.json') ? pdate + '.json' : has(LANDING.file) ? LANDING.file : idx[0].file;
   let ok = false;
   for (let k = 0; k < 6 && !ok; k++) { ok = await checkHealth(); if (!ok) await wait(500); }
   setInterval(checkHealth, 5000);
-  const auto = params.get('auto') === 'none' ? null : params.get('scenario') || 'dry';
+  const auto = params.get('auto') === 'none' ? null : params.get('scenario') || LANDING.scenario;
   await loadSample(file, auto);
 }
