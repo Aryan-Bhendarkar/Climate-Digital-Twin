@@ -18,8 +18,8 @@ repo/
 ```bash
 pip install torch numpy fastapi uvicorn        # runtime deps (torch CPU is enough)
 python serve.py --port 8000                     # listens on 0.0.0.0; /health is ready in ~2 s
-# dashboard (second terminal)
-cd dashboard && python -m http.server 8080      # open http://localhost:8080
+# dashboard (second terminal): serves the page and forwards /api/* to the model server on one port
+cd dashboard && python devserver.py             # open http://127.0.0.1:8080/?server=api
 ```
 `/simulate` takes `{"init_states":[3,6,32,36], "doy_sincos":[sin,cos], "steps":10, "perturbation":null|[6,32,36]}` in physical units. It returns `{"rollout":[steps,6,32,36], "inference_ms":...}`. A 10-day rollout takes about 0.3 s on 2 CPU cores.
 

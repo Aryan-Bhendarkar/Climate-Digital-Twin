@@ -14,8 +14,17 @@ const VARS = [
   { key: 'msl', short: 'MSLP', label: 'Sea-level pressure', unit: 'hPa', cmapV: 'cividis', cmapD: 'rdbu', dec: 1, f: (r, d, k) => r[rIdx(d, 4) + k] / 100 },
   { key: 'tcwv', short: 'TCWV', label: 'Column water vapour', unit: 'kg/m²', cmapV: 'mako', cmapD: 'brbg', dec: 1, f: (r, d, k) => r[rIdx(d, 5) + k] },
 ];
+// Server URL: ?server=api -> same-origin proxy (dashboard/devserver.py); else last used; else 127.0.0.1:8000
+// (127.0.0.1, not "localhost": on Windows localhost may resolve to IPv6 while the server listens on IPv4).
+function defaultServer() {
+  const q = new URLSearchParams(location.search).get('server');
+  if (q === 'api') return `${location.origin}/api`;
+  if (q) return q;
+  try { const s = localStorage.getItem('mm_server'); if (s) return s; } catch (e) { /* storage unavailable */ }
+  return 'http://127.0.0.1:8000';
+}
 const S = {
-  api: new Api(localStorage.getItem('mm_server') || 'http://localhost:8000'),
+  api: new Api(defaultServer()),
   assets: null, samples: [], sample: null, init: null, doy: null, name: '',
   prime: null, mv: null, mvInit: null, msP: null, msM: null, shock: null, rip: null,
   v: 0, day: 1, playing: false, timer: null, box: null, comps: [], pick: { i: 14, j: 18 }, healthy: false, baseP: null,
