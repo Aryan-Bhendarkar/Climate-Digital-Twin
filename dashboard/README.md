@@ -34,7 +34,7 @@ Notes on the plain-language numbers
 * Headline and cards ignore the two tiny groups "Islands" and "Small UTs" (not farming regions); the Expert tables still list them.
 * "Extra hot days" = days a state's mean temperature exceeds the usual hottest 5 % (P95) for that month (`assets/heat_p95.json`).
 * Wind power = capacity-factor proxy of a generic turbine for the 6 windiest states; only the change is meaningful.
-* "36 % lower error than tomorrow = today" (`ui/src/lib/config.js`) is the day-1 skill of the 3-seed validation ensemble that held out 2019-21 (a fixed number, not computed live); the submitted model was then retrained on all years.
+* "34 % lower error than tomorrow = today" (`ui/src/lib/config.js`) is the day-1 skill of the 3-seed validation ensemble that held out 2019-21 (a fixed number, not computed live); the submitted model was then retrained on all years.
 * The 900 km figure is the architecture limit (8 grid cells of 1 degree per day), not a measurement.
 * Rainfall and humidity difference maps use brown (less) / green (more) because blue-for-drier is confusing next to rain maps; temperature, wind and pressure use blue (less) / red (more).
 

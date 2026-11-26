@@ -47,13 +47,15 @@ Self-check (no data needed): `python tests/test_contract.py` (determinism, null 
 ## Evaluation (held-out 2019–2021)
 **Protocol.** The same recipe was trained on 2005–2018 only and tested on 2019–2021, which it never trained on (recipe choices such as rollout length and ensemble size were selected on these years, so the numbers are mildly optimistic), using a local copy of the organisers' published scoring functions. The submitted weights use that same recipe retrained on all of 2005–2021, so they cannot be scored on 2019–21 themselves. The hidden 2023–24 windows are the real test.
 
-Skill = 1 − RMSE / RMSE of the better reference (persistence or day-of-year climatology), chosen **per lead day** (the strict reading), latitude-weighted, RMSE pooled over 217 windows (every 5th day of 2019–21), then averaged over the 6 variables. Averaging the per-window skill instead gives +0.32 / +0.07 / −0.01 vs the better reference (+0.34 / +0.26 / +0.24 vs persistence):
+Skill = 1 − RMSE / RMSE of the better reference (persistence or day-of-year climatology), chosen **per lead day** (the strict reading), latitude-weighted, computed per window and averaged over 217 windows (every 5th day of 2019–21) and the 6 variables, as the organisers' scoring functions do:
 
-| Lead | Skill vs best reference |
-|---|---|
-| Day 1 | **+0.36** (also +0.36 vs persistence) |
-| Day 4 | **+0.13** (+0.29 vs persistence) |
-| Day 8 | +0.03 pooled, −0.01 per-window mean (level with climatology; +0.27 vs persistence) |
+| Lead | Skill vs better reference | Skill vs persistence ("tomorrow = today") |
+|---|---|---|
+| Day 1 | **+0.32** | +0.34 |
+| Day 4 | **+0.07** | +0.26 |
+| Day 8 | −0.01 (level with climatology) | +0.24 |
+
+(Pooling the RMSE over all windows before taking the ratio gives +0.36 / +0.13 / +0.03.)
 
 - Heavy-rain (>10 mm/day) CSI, mean over the scored leads: 0.29, against 0.19 for persistence and 0.16 for climatology.
 - Day-8 spatial variance stays at 0.71–1.00 of the truth per variable over 217 windows (0.53–1.03 on the 5 named windows; single windows can dip to ~0.3 for rain), against an anti-blur gate of ≥ 0.40.
