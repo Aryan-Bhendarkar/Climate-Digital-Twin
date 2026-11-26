@@ -1,6 +1,9 @@
-"""Adapter so tools/local_grade.py can grade a checkpoint in-process (no server):
+"""In-process simulate() for an evaluation harness (no server).
 
-    MONSOON_WEIGHTS=weights/val.pt python tools/local_grade.py --model tools.model_adapter:simulate --suite both
+Our grader (a local copy of the kit's monsoon_r1 scoring functions plus window lists) lives outside this
+repo; any harness that calls simulate(init_states, doy_sincos, steps, perturbation) works:
+
+    MONSOON_WEIGHTS=weights/val.pt python -c "from tools.model_adapter import simulate; ..."
 """
 from __future__ import annotations
 

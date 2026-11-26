@@ -1,9 +1,10 @@
 # Monsoon Multiverse — dashboard
 
-An AI twin of India's weather: see the next 10 days, then ask "what if?". Pure static HTML + ES modules + Canvas 2D:
-no build step, no npm, no CDN, no fonts or map tiles from the internet, **zero external requests**.
+An AI twin of India's weather: see the next 10 days, then ask "what if?". Static files only (the default v3 UI is
+pre-built into `v2/` from the sources in `ui/`; the older v1 at `?ui=v1` is plain ES modules): no npm needed to run,
+no CDN, fonts vendored, **zero external requests**.
 Every number on screen comes from live calls to the model server (`js/api.js`; Normal and What-if forecasts run in parallel);
-only the 3-day *input* states in `samples/` and geography/climate statistics in `assets/` are shipped. Total size < 1 MB.
+only the 3-day *input* states in `samples/` and geography/climate statistics in `assets/` are shipped. Shipped size ~1.4 MB (plus ~0.4 MB of UI sources in `ui/`).
 
 ## Run
 
@@ -33,7 +34,7 @@ Notes on the plain-language numbers
 * Headline and cards ignore the two tiny groups "Islands" and "Small UTs" (not farming regions); the Expert tables still list them.
 * "Extra hot days" = days a state's mean temperature exceeds the usual hottest 5 % (P95) for that month (`assets/heat_p95.json`).
 * Wind power = capacity-factor proxy of a generic turbine for the 6 windiest states; only the change is meaningful.
-* "24 % more accurate than tomorrow = today" is the day-1 skill measured in the validation run that held out 2019-21; the submitted model was then retrained on all years.
+* "36 % lower error than tomorrow = today" (`ui/src/lib/config.js`) is the day-1 skill of the 3-seed validation ensemble that held out 2019-21 (a fixed number, not computed live); the submitted model was then retrained on all years.
 * The 900 km figure is the architecture limit (8 grid cells of 1 degree per day), not a measurement.
 * Rainfall and humidity difference maps use brown (less) / green (more) because blue-for-drier is confusing next to rain maps; temperature, wind and pressure use blue (less) / red (more).
 

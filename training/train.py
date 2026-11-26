@@ -5,7 +5,7 @@ its own rollout errors -> no drift). Loss is per channel and per lead, divided b
 (persistence or climatology) at that lead -- the same normalisation the skill score uses.
 
 Examples:
-  # validation run (hold out 2019-2021), then grade with tools/local_grade.py
+  # validation run (hold out 2019-2021); grade with the kit's scoring functions via tools/model_adapter.py
   python training/train.py --data ../data/india_climate_train.nc --train-end 2018 --out weights/val.pt
   # final model on all years
   python training/train.py --data ../data/india_climate_train.nc --train-end 2021 --out weights/emulator.pt

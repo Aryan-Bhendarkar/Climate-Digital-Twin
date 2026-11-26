@@ -20,10 +20,11 @@ repo/
 ## Quick start (offline)
 ```bash
 pip install torch numpy fastapi uvicorn        # runtime deps (torch CPU is enough)
-python serve.py --port 8000                     # listens on 0.0.0.0; /health is ready in ~2 s
+python serve.py --port 8000                     # listens on 0.0.0.0; /health is ready in ~4 s
 # dashboard (second terminal): serves the page and forwards /api/* to the model server on one port
 cd dashboard && python devserver.py             # open http://127.0.0.1:8080/?server=api
 ```
+Self-check (no data needed): `python tests/test_contract.py` (determinism, null shock, 8-cell/day reach, output guards).
 `/simulate` takes `{"init_states":[3,6,32,36], "doy_sincos":[sin,cos], "steps":10, "perturbation":null|[6,32,36]}` in physical units. It returns `{"rollout":[steps,6,32,36], "inference_ms":...}`. A 10-day rollout takes about 0.5–1 s on 4 CPU cores (three ensemble members run side by side, each on one core).
 
 **Tested like the judging sandbox:** fresh clone, clean Python 3.12 with only torch (CPU), numpy, fastapi and uvicorn, network switched off, 4 cores: the kit's schema validator passes, `/health` is ready in ~4 s, `/simulate` takes ~0.6 s for 10 days (~1.5 s for 30), peak memory ~0.85 GB.
@@ -32,32 +33,32 @@ cd dashboard && python devserver.py             # open http://127.0.0.1:8080/?se
 | Piece | Choice | Why |
 |---|---|---|
 | State | Anomaly from a smooth seasonal climatology (3 Fourier harmonics per grid cell and variable, fitted on training years, stored as model weights) | The net learns *weather*, not the calendar. At long leads it relaxes toward a sensible seasonal state instead of drifting. There is no per-day lookup table. |
-| Rain | Modelled in `log1p` space | Heavy-tailed rain becomes learnable. Output guards keep rain ≥ 0, water vapour ≥ 0 and temperature in physical bounds. |
+| Rain | Modelled in `log1p` space | Heavy-tailed rain becomes learnable. Output guards keep rain ≥ 0, water vapour ≥ 0 and 2 m temperature inside 233–333 K (the contract's validity range; never reached in normal rollouts). |
 | Step | Predicts the 1-day **tendency** (residual) | The identity path keeps fine structure, which fights blur, and a shock's day-1 response starts exactly where it was applied. |
-| Network | 8 residual blocks (width 96), each with exactly **one 3×3 convolution** and per-cell normalisation (~1.5 M parameters per member) | Receptive field = **8 grid cells (~900 km) per simulated day**: a hard upper bound by construction, so a shock can never jump across the map (measured response beyond that radius: exactly 0). Real responses spread more slowly. There is no global attention, FFT or batch-wide statistic. |
+| Network | 8 residual blocks (width 96), each with exactly **one 3×3 convolution** and per-cell normalisation (~1.5 M parameters per member) | Receptive field = **8 grid cells per simulated day in any direction** (~900 km north–south or east–west, up to ~1,250 km diagonally): a hard upper bound by construction, so a shock can never jump across the map (measured response beyond that radius: exactly 0). Real responses spread more slowly. There is no global attention, FFT or batch-wide statistic. |
 | Inputs | Anomalies of the last 3 days, target-day seasonal signal, land–sea mask, orography, day-of-year, lat/lon | Static geography lets the net learn the Western Ghats, the Himalaya and the coastlines. |
 | Training | 1-step, then **unrolled 2 → 4-day** rollouts with full back-propagation, EMA weights | The model is trained on its own forecasts, so it learns to correct its errors instead of compounding them (anti-drift). Going on to 8–10-day rollouts fit the training years better but scored worse on held-out years, so we stop at 4. |
 | Calibration | One least-squares gain per lead and variable on the output anomaly (~50 numbers, fit on training years). Rain is not scaled. | Long leads shrink toward the seasonal climate exactly as much as the training data supports (like MOS post-processing). |
 | Loss | Latitude-weighted MSE per variable and lead, **divided by the error of the best reference** (persistence or climatology), ×2 at days 1/4/8, heavy-rain (>10 mm/day) cells up-weighted | Optimises exactly what matters: beating "repeat yesterday" and climatology, including heavy rain. |
 | Robustness | Random ±0.7 K temperature offsets during training | 2023–24 is warmer than the 2005–2021 training period. |
-| Ensemble | Three copies of the same recipe trained with different random seeds; the server averages their forecasts | Averaging cancels part of each copy's own errors and steadies the size of shock responses: on held-out years 3 copies scored ~+8 points (strict) over the best single copy, 2 copies ~+5. Every copy is local and deterministic, so the average is too. |
+| Ensemble | Three copies of the same recipe trained with different random seeds; the server averages their forecasts | Averaging cancels part of each copy's own errors and steadies the size of shock responses: on held-out years 3 copies scored +4 (5 named windows) to ~+8 (217 windows) points (strict) over the best single copy. Every copy is local and deterministic, so the average is too. |
 | Determinism | No dropout or noise at inference, deterministic kernels | A zero shock returns a bit-identical forecast. |
 
 ## Evaluation (held-out 2019–2021)
-**Protocol.** The same recipe was trained on 2005–2018 only and tested on 2019–2021, which it never saw, using a local copy of the organisers' published scoring functions. The submitted weights use that same recipe retrained on all of 2005–2021, so they cannot be scored on 2019–21 themselves. The hidden 2023–24 windows are the real test.
+**Protocol.** The same recipe was trained on 2005–2018 only and tested on 2019–2021, which it never trained on (recipe choices such as rollout length and ensemble size were selected on these years, so the numbers are mildly optimistic), using a local copy of the organisers' published scoring functions. The submitted weights use that same recipe retrained on all of 2005–2021, so they cannot be scored on 2019–21 themselves. The hidden 2023–24 windows are the real test.
 
-Skill = 1 − RMSE / RMSE of the better reference (persistence or day-of-year climatology), chosen **per lead day** (the strict reading), latitude-weighted, mean of 6 variables, 217 windows (every 5th day of 2019–21):
+Skill = 1 − RMSE / RMSE of the better reference (persistence or day-of-year climatology), chosen **per lead day** (the strict reading), latitude-weighted, RMSE pooled over 217 windows (every 5th day of 2019–21), then averaged over the 6 variables. Averaging the per-window skill instead gives +0.32 / +0.07 / −0.01 vs the better reference (+0.34 / +0.26 / +0.24 vs persistence):
 
 | Lead | Skill vs best reference |
 |---|---|
 | Day 1 | **+0.36** (also +0.36 vs persistence) |
 | Day 4 | **+0.13** (+0.29 vs persistence) |
-| Day 8 | +0.03 (about level with climatology; +0.27 vs persistence) |
+| Day 8 | +0.03 pooled, −0.01 per-window mean (level with climatology; +0.27 vs persistence) |
 
 - Heavy-rain (>10 mm/day) CSI, mean over the scored leads: 0.29, against 0.19 for persistence and 0.16 for climatology.
-- Day-8 spatial variance stays at 0.53–1.03 of the truth per variable, against an anti-blur gate of ≥ 0.40.
+- Day-8 spatial variance stays at 0.71–1.00 of the truth per variable over 217 windows (0.53–1.03 on the 5 named windows; single windows can dip to ~0.3 for rain), against an anti-blur gate of ≥ 0.40.
 - Null shock: bit-identical forecast. Day-1 shock response: ≥ 99 % within 3 cells of the shocked box.
-- Our grader totals, out of 70 (automated forecast + blur + causality parts): about 61–67 on the strict reading and 70 on the lenient one (a single copy: about 57–59 strict). How the official grader combines lead days is not published, so we optimised for the stricter reading.
+- Our grader totals, out of 70 (automated forecast + blur + causality parts): about 61–67 on the strict reading and 70 on the lenient one (single copies: 51–57 strict on the named windows). How the official grader combines lead days is not published, so we optimised for the stricter reading.
 
 **Reproduce the submitted weights:**
 ```bash
@@ -89,3 +90,5 @@ There is also a **wind-power index** for the six major wind states (10 m wind �
 
 ## Data & originality
 Trained only on the organiser-provided `india_climate_train.nc` (2005–2021). Nothing is downloaded at run time. All code, training and weights were built during the hackathon.
+
+Code: MIT (see `LICENSE`). Fonts: SIL OFL (`dashboard/ui/FONTS-LICENSE.txt`). State boundaries: Natural Earth (public domain). Data: organiser-provided, not redistributed.
