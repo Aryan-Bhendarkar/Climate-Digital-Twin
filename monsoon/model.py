@@ -22,6 +22,7 @@ import torch.nn.functional as F
 N_CH = 6          # t2m, tp, u10, v10, msl, tcwv
 T_IN = 3          # days of history
 TP = 1            # rain channel index
+TCWV = 5          # total column water vapour channel index
 N_HARM = 3        # Fourier harmonics of the seasonal climatology
 T2M_MIN, T2M_MAX = 233.15, 333.15
 MAX_LEAD = 30     # longest rollout the server accepts
@@ -126,6 +127,7 @@ class Emulator(nn.Module):
         x = z.clone()
         x[..., TP, :, :] = torch.expm1(x[..., TP, :, :]).clamp_min(0)
         x[..., 0, :, :] = x[..., 0, :, :].clamp(T2M_MIN, T2M_MAX)
+        x[..., TCWV, :, :] = x[..., TCWV, :, :].clamp_min(0)       # water vapour cannot be negative
         return x
 
     def to_anom(self, z: torch.Tensor, ang: torch.Tensor) -> torch.Tensor:
