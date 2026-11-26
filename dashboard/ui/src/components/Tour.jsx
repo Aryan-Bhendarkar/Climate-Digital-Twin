@@ -26,7 +26,7 @@ export function Tour() {
       <div class="tour-card" ref={card} tabIndex={-1} role="dialog" aria-label={`Tour step ${i + 1} of ${STEPS.length}`} style={{ left: left + 'px', top: top + 'px', width: CW + 'px' }}>
         <div class="tc-step">Step {i + 1} of {STEPS.length}</div>
         <h3>{st.title}</h3>
-        <p>{st.body}</p>
+        <p>{typeof st.body === 'function' ? st.body() : st.body}</p>
         <div class="tc-nav">
           <button class="link" onClick={exitTour}>Exit (Esc)</button>
           <span>{i > 0 && <button class="btn" onClick={prevStep}>Back</button>} <button class="btn primary" onClick={nextStep}>{i === STEPS.length - 1 ? 'Done' : 'Next'}</button></span>
