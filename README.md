@@ -81,7 +81,7 @@ There is also a **wind-power index** for the six major wind states (10 m wind �
 ## Limitations (honest)
 - 1° daily grid, 6 surface variables: no SST, no upper air, no boundary inflow from outside the box. The edges are the least reliable.
 - Day 8–10 forecasts are about as good as climatology. The weather part of the forecast is deliberately damped there, so the map keeps its seasonal structure but little day-to-day detail.
-- Rain is the hardest variable. Heavy-rain cores are often 1–2 cells off. A strong ocean-warming shock can trigger a large local rain response (> 5 σ in ~6 % of start dates).
+- Rain is the hardest variable. Heavy-rain cores are often 1–2 cells off. A strong ocean-warming shock can trigger a large local rain response (> 5 σ in ~5 % of shocked runs on held-out years).
 - Shock responses are learned statistical associations, not a physics solver: there is no water or energy conservation. The **direction** of a response is more robust than its size (two trainings of the same recipe agree in sign but can differ ~3× in magnitude). Wind-only shocks fade within ~3 days. A shock far beyond the 2005–2021 range is extrapolation.
 - The impact indicators are scenario-comparison tools on a 1° grid, not validated agricultural advisories.
 - State boundaries in the dashboard are Natural Earth (public domain), indicative only.
