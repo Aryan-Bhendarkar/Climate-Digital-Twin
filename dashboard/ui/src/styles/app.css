@@ -193,3 +193,35 @@ select { width: 100%; padding: 7px 28px 7px 10px; border: 1px solid var(--rule);
 @media (max-width: 1500px) { .hero-steps { display: none; } .hero { gap: 16px; } .hero-btns { margin-left: auto; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; } }
 .field.grow { flex: 1; }
+
+/* ---- v3 review fixes ---- */
+.status .dot.off { background: #8C9A9F; }
+.hero.closed { background: transparent; }
+.hero-sentence.small { font-size: 0.9375rem; color: var(--ink2); }
+.plate-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.plate-row { min-width: 0; }
+.fig.muted-fig .fig-line { color: var(--ink3); font-weight: 400; }
+.big.none { color: var(--ink3); }
+.honest { border-top: 0; padding-top: 0; margin-top: 4px; color: var(--ink2); }
+.hl-sub { margin-top: 6px; }
+.row[aria-disabled=true], .row:disabled[aria-disabled=true] { opacity: .5; }
+.tour-card p { font-size: 14px; }
+.strongest { font-size: 0.75rem; color: var(--ink2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strongest b { color: var(--ink); font-weight: 600; }
+.tbl td.n, .tbl th.n { white-space: nowrap; }
+.st-top .from { font-weight: 400; color: var(--ink3); font-size: 0.75rem; }
+.legend-foot > span:first-child { flex: 1 1 auto; min-width: 0; }
+.legend-foot > span:last-child { flex: none; white-space: nowrap; }
+.strongest { white-space: normal; display: block; }
+.legend-words { align-items: baseline; } .legend-words .unit { white-space: normal; text-align: right; }
+.datenote { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.plate-row .vtabs { flex: none; }
+.row { min-height: 38px; }
+.step { padding: 8px 0; } .step:first-child { padding-top: 10px; }
+.headline { font-size: 1.375rem; }
+.fig { padding-top: 8px; }
+.row { min-height: 36px; }
+.step h3 { margin-bottom: 4px; }
+.figs { margin-top: 6px; }
+.fig .link { margin-top: 2px; }
+.rail { padding-bottom: 4px; }

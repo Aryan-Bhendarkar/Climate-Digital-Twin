@@ -2,7 +2,7 @@ import { useRef, useEffect, useMemo, useState } from 'preact/hooks';
 import * as S from '../store.js';
 import { VARS, bundleFields } from '../lib/fields.js';
 import { bitmapFor } from './MapStage.jsx';
-import { sgn } from '../lib/narrative.js';
+import { sgn, stateBars, fmtRain, lowBase, dMm, rainVal } from '../lib/narrative.js';
 import { spreadKm } from '../lib/spread.js';
 import { SPEED_KM_PER_DAY } from '../lib/config.js';
 import { Chart, AX } from './Chart.jsx';
@@ -12,24 +12,27 @@ const BROWN = '#9A6212', TEAL = '#1F8A80';
 
 function States() {
   const r = S.result.value, [all, setAll] = useState(false);
+  if (S.customOpen.value && S.customFresh.value) return <p class="side-empty">Press Run my what-if to see the states that get drier or wetter.</p>;
   if (!r) return <p class="side-empty">Pick a what-if and the states that get drier or wetter appear here.</p>;
-  const rows = [...r.imp.K.rows].sort((a, b) => b.dRain - a.dRain), max = Math.max(10, ...rows.map((x) => Math.abs(x.dRain)));
-  const big = rows.filter((x) => Math.abs(x.dRain) >= 2), wet = big.filter((x) => x.dRain > 0).slice(0, 5), dry = big.filter((x) => x.dRain < 0).slice(-5), hidden = rows.length - wet.length - dry.length;
-  const show = all ? rows : [...wet, ...(hidden > 0 && (wet.length || dry.length) ? [null] : []), ...dry];
-  if (!all && !show.length) return <p class="side-empty">No state&rsquo;s rain moves by more than 2 %.</p>;
+  const { rows, shown, hidden } = stateBars(r.imp.K), max = Math.max(10, ...rows.filter((x) => !lowBase(x)).map((x) => Math.abs(x.dRain)));
+  const list = all ? rows : shown;
+  if (!all && !list.length) return <p class="side-empty">No state&rsquo;s rain moves by more than 2 %.</p>;
   const hl = new Set(r.hl.ids);
+  const width = (x) => (lowBase(x) ? Math.min(50, Math.abs(dMm(x)) * 5) : Math.min(50, (Math.abs(x.dRain) / max) * 50));
   return (
     <div class="states">
-      <p class="side-cap">10-day rain change, state by state</p>
+      <p class="side-cap">10-day rain change, by state (strongest first)</p>
       <ul role="list">
-        {show.map((x, n) => x === null ? <li key="gap" class="gap">{hidden} more states change less</li> : (
-          <li key={x.id} class={(hl.has(x.id) ? 'hl ' : '') + (Math.abs(x.dRain) < 5 ? 'noise' : '')} onMouseEnter={() => (S.pickState.value = x.id)} onMouseLeave={() => (S.pickState.value = null)} onFocus={() => (S.pickState.value = x.id)} onBlur={() => (S.pickState.value = null)} tabIndex={0}>
-            <div class="st-top"><span>{x.name}</span><b>{sgn(x.dRain, Math.abs(x.dRain) < 10 ? 1 : 0)} %</b></div>
-            <div class="track" aria-hidden="true"><i class="zero" /><i class={'bar ' + (x.dRain < 0 ? 'neg' : 'pos')} style={{ width: Math.min(50, (Math.abs(x.dRain) / max) * 50) + '%', [x.dRain < 0 ? 'right' : 'left']: '50%' }} /></div>
+        {list.map((x) => (
+          <li key={x.id} data-state={x.name} data-val={fmtRain(x)} class={(hl.has(x.id) ? 'hl ' : '') + (lowBase(x) || Math.abs(x.dRain) < 5 ? 'noise' : '')} onMouseEnter={() => (S.pickState.value = x.id)} onMouseLeave={() => (S.pickState.value = null)} onFocus={() => (S.pickState.value = x.id)} onBlur={() => (S.pickState.value = null)} tabIndex={0}
+            title={lowBase(x) ? `Normally almost dry here (${x.p.total.toFixed(1)} mm in 10 days), so the change is shown in mm.` : `${x.p.total.toFixed(0)} mm normally, ${x.m.total.toFixed(0)} mm with your change`}>
+            <div class="st-top"><span>{x.name}</span><b>{fmtRain(x)}{lowBase(x) ? <span class="from"> (from {x.p.total.toFixed(1)} mm)</span> : null}</b></div>
+            <div class="track" aria-hidden="true"><i class="zero" /><i class={'bar ' + (rainVal(x) < 0 ? 'neg' : 'pos')} style={{ width: width(x) + '%', [rainVal(x) < 0 ? 'right' : 'left']: '50%' }} /></div>
           </li>))}
+        {!all && hidden > 0 && <li key="gap" class="gap">{hidden} more {hidden === 1 ? 'state changes' : 'states change'} less</li>}
       </ul>
-      <div class="side-foot"><span><i class="sw neg" />drier</span><span><i class="sw pos" />wetter</span><span class="muted">faint = within noise</span>
-        {rows.length > show.length && <button class="link" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${rows.length}`}</button>}</div>
+      <div class="side-foot"><span><i class="sw neg" />drier</span><span><i class="sw pos" />wetter</span><span class="muted">faint = under 5 %, or almost no normal rain (shown in mm)</span>
+        {rows.length > shown.length && <button class="link" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${rows.length}`}</button>}</div>
     </div>
   );
 }
@@ -66,7 +69,7 @@ function Spread() {
       <div class="minis">{[0, 2, 4, 7].map((d) => <Mini key={d} d={d} vi={vi} />)}</div>
       <p class="side-cap">How far the change has spread</p>
       {chart && <Chart data={chart.data} opts={chart.opts} height={150} label="Line chart: distance in kilometres the change has spread from your box, by forecast day" />}
-      <p class="side-foot muted">Solid: farthest place that changed noticeably. Dotted: the model&rsquo;s speed limit, {SPEED_KM_PER_DAY} km a day.</p>
+      <p class="side-foot muted">Solid: farthest place that changed noticeably. Dotted: the model&rsquo;s built-in limit, at most ~{SPEED_KM_PER_DAY} km per day. So by day 10 a change can show up far from your box.</p>
     </div>
   );
 }

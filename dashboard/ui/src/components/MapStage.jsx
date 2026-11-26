@@ -3,7 +3,7 @@ import { useSignalEffect } from '@preact/signals';
 import { MapView, makeBitmap, isobars } from '../lib/mapdraw.js';
 import { VARS, bundleFields, varIndex } from '../lib/fields.js';
 import { boxFromLatLon } from '@lib/shock.js';
-import { REGIONS } from '../lib/narrative.js';
+import { REGIONS, DATE_WORDS, whereIs } from '../lib/narrative.js';
 import { NORMAL, lutNormal, lutDiff, gradientCss, tOf } from '../lib/scales.js';
 import { sgn } from '../lib/narrative.js';
 import { rIdx, NCELL, NLON } from '@lib/util.js';
@@ -108,27 +108,28 @@ export function HoverTip() {
   );
 }
 
+export const MODE_NAMES = { normal: 'Normal forecast', whatif: 'With your change', diff: 'Only the change' };
 export function PlateHead() {
   const b = S.bundle.value, md = b && b.mv ? S.mode.value : 'normal', v = VARS[S.varIdx.value], sm = S.sample.value;
   const hasWi = !!(b && b.mv);
-  const title = `${md === 'diff' ? v.name + ' change' : v.name}, day ${S.day.value} of 10`;
-  const words = sm ? ({ 'onset.json': 'monsoon arriving in Kerala', 'heavy_rain.json': 'heavy monsoon rain', 'heatwave.json': 'severe heatwave', 'cyclone.json': 'Cyclone Amphan', 'western_disturbance.json': 'winter storm from the west' }[sm.file] || sm.name) : '';
+  const title = `${MODE_NAMES[md]}: ${(v.short || v.name).toLowerCase()}, day ${S.day.value}`;
+  const words = sm ? (DATE_WORDS[sm.file] || sm.name) : '';
   return (
     <div class="plate-head">
       <div class="plate-row">
-        <h2 class="plate-title"><span class="plate-no">Plate {md === 'diff' ? 2 : 1}.</span> {title}</h2>
+        <h2 class="plate-title" title={title}>{title}</h2>
         <div class="vtabs" role="tablist" aria-label="What to show on the map" data-tour="vars">
           {VARS.map((x) => <button key={x.key} role="tab" aria-selected={S.varKey.value === x.key} title={x.tip} class={S.varKey.value === x.key ? 'on' : ''} onClick={() => (S.varKey.value = x.key)}>{x.short || x.name}</button>)}
         </div>
       </div>
       <div class="plate-row sub">
         <div class="seg" role="tablist" aria-label="Which forecast to show" data-tour="modes">
-          {[['normal', 'Normal'], ['whatif', 'What-if'], ['diff', 'Difference']].map(([k, l]) => (
+          {[['normal', MODE_NAMES.normal], ['whatif', MODE_NAMES.whatif], ['diff', MODE_NAMES.diff]].map(([k, l]) => (
             <button key={k} role="tab" aria-selected={md === k} class={md === k ? 'on' : ''} disabled={k !== 'normal' && !hasWi} onClick={() => S.setMode(k)}
-              title={{ normal: 'The AI’s forecast if nothing unusual happens', whatif: 'The forecast after your what-if', diff: 'What-if minus normal: where and how much the weather changes' }[k]}>{l}</button>
+              title={{ normal: 'The AI\u2019s forecast if nothing unusual happens', whatif: 'The forecast after your what-if', diff: 'With your change minus normal: where and how much the weather changes' }[k]}>{l}</button>
           ))}
         </div>
-        {sm && <p class="datenote">Replay of {sm.date_label}, {words}. Not a live forecast.</p>}
+        {sm && <p class="datenote" title={`Replay of ${sm.date_label}, ${words}. Not a live forecast.`}>Replay of {sm.date_label} &middot; not a live forecast</p>}
       </div>
     </div>
   );
@@ -142,7 +143,9 @@ export function Legend() {
     const A = F.A, dec = A < 2 ? 2 : A < 10 ? 1 : 0; lut = lutDiff(v.dcmap);
     ticks = [[0, sgn(-A, dec)], [0.25, sgn(-A / 2, dec + (A / 2 < 1 ? 1 : 0))], [0.5, 'no change'], [0.75, sgn(A / 2, dec + (A / 2 < 1 ? 1 : 0))], [1, sgn(A, dec)]];
     words = F.quiet ? `Almost no change in ${v.noun} from this what-if. Try another quantity above.` : v.dwords;
-    endNote = 'Scale locked for all 10 days';
+    const D = F.D[S.day.value - 1]; let kmax = 0; for (let k = 1; k < D.length; k++) if (Math.abs(D[k]) > Math.abs(D[kmax])) kmax = k;
+    const dv = D[kmax], dd = Math.abs(dv) < 10 ? (Math.abs(dv) < 1 ? 2 : 1) : 0;
+    endNote = <span class="strongest" data-strongest={whereIs(kmax, S.assets.value)}>Strongest change on this map: <b>{whereIs(kmax, S.assets.value)}</b> ({sgn(dv, dd)} {v.unit})</span>;
   } else {
     const sc = NORMAL[v.key]; lut = lutNormal(v.key); words = v.words;
     ticks = sc.ticks.map((t) => [tOf(sc, t), String(t)]);
@@ -150,7 +153,7 @@ export function Legend() {
   }
   return (
     <div class="legend" data-tour="legend">
-      <div class="legend-words"><span>{words}</span><span class="unit">{md === 'diff' ? v.unit + ' (what-if minus normal)' : v.unit}</span></div>
+      <div class="legend-words"><span>{words}</span><span class="unit">{md === 'diff' ? v.unit + ', change vs normal \u00B7 same scale all 10 days' : v.unit}</span></div>
       <div class="legend-bar" style={{ background: gradientCss(lut) }} />
       <div class="legend-ticks">{ticks.map(([t, l], i) => <span key={i} style={{ left: t * 100 + '%' }} class={i === 0 ? 'first' : i === ticks.length - 1 ? 'last' : ''}>{l}</span>)}</div>
       <div class="legend-foot"><span>{endNote || ''}</span><span>1° grid · ERA5-derived · model output</span></div>

@@ -1,6 +1,6 @@
 import { useMemo } from 'preact/hooks';
 import * as S from '../store.js';
-import { sgn } from '../lib/narrative.js';
+import { sgn, fmtRain, lowBase, rainVal, LOW_RAIN_MM, HEAT_DEF } from '../lib/narrative.js';
 import { Chart, AX } from './Chart.jsx';
 import { PlaceChart } from './SidePanel.jsx';
 import { Icon } from './icons.jsx';
@@ -9,17 +9,20 @@ const TABS = [['states', 'State table'], ['wind', 'Wind power'], ['ripple', 'Rip
 function Empty() { return <p class="side-empty">Run a what-if first. The tables compare the what-if with the normal forecast.</p>; }
 
 function StateTable({ r }) {
-  const rows = [...r.imp.K.rows].sort((a, b) => a.dRain - b.dRain);
+  const rows = [...r.imp.K.rows].sort((a, b) => Math.abs(rainVal(b)) - Math.abs(rainVal(a)));
   return (
-    <table class="tbl"><caption>Rain and heat by state, 10 days. Departures are measured against the normal forecast.</caption>
-      <thead><tr><th>State</th><th class="n">Rain, normal (mm)</th><th class="n">Rain, what-if (mm)</th><th class="n">Change</th><th>Band (IMD)</th><th class="n">Very hot days, normal</th><th class="n">What-if</th><th class="n">Farm stress</th></tr></thead>
-      <tbody>{rows.map((x) => <tr key={x.id} class={Math.abs(x.dRain) >= 10 ? 'notable' : ''}><td>{x.name}</td><td class="n">{x.p.total.toFixed(0)}</td><td class="n">{x.m.total.toFixed(0)}</td><td class="n">{sgn(x.dRain, 1)} %</td><td><span class={'tick ' + x.band.key}>{x.band.label}</span></td><td class="n">{x.p.heat}</td><td class="n">{x.m.heat}</td><td class="n"><i class={'sq s' + x.m.stress.toFixed(0)} />{x.p.stress.toFixed(1)} &rarr; {x.m.stress.toFixed(1)}</td></tr>)}</tbody>
-    </table>);
+    <div>
+    <table class="tbl"><caption>Rain and heat by state, 10 days, compared with the normal forecast. States with under {LOW_RAIN_MM} mm of normal rain show the change in mm.</caption>
+      <thead><tr><th>State</th><th class="n">Rain, normal (mm)</th><th class="n">Rain, with change (mm)</th><th class="n">Change</th><th>Band (IMD)</th><th class="n">Very hot days (normal &rarr; with change)</th><th class="n">Farm stress* (normal &rarr; with change)</th></tr></thead>
+      <tbody>{rows.map((x) => <tr key={x.id} class={!lowBase(x) && Math.abs(x.dRain) >= 10 ? 'notable' : ''}><td>{x.name}</td><td class="n">{x.p.total.toFixed(x.p.total < 10 ? 1 : 0)}</td><td class="n">{x.m.total.toFixed(x.m.total < 10 ? 1 : 0)}</td><td class="n">{fmtRain(x)}</td><td>{lowBase(x) ? <span class="muted">dry season</span> : <span class={'tick ' + x.band.key}>{x.band.label}</span>}</td><td class="n">{x.p.heat} &rarr; {x.m.heat}</td><td class="n"><i class={'sq s' + x.m.stress.toFixed(0)} />{x.p.stress.toFixed(1)} &rarr; {x.m.stress.toFixed(1)}</td></tr>)}</tbody>
+    </table>
+    <p class="side-foot muted">{HEAT_DEF} *Farm stress: 0 to 3, the mean of a rain tier (deficit vs. the 2005&ndash;2018 normal for the month, plus long dry spells) and a heat tier (number of very hot days).</p>
+    </div>);
 }
 function WindTable({ r }) {
   return (
-    <table class="tbl"><caption>Wind-farm output of a generic turbine in the 6 windiest states (share of rated power, 10-day mean).</caption>
-      <thead><tr><th>State</th><th class="n">Normal</th><th class="n">What-if</th><th class="n">Change</th></tr></thead>
+    <table class="tbl"><caption>Wind-farm output of a generic turbine in the 6 main wind-power states (share of rated power, 10-day mean).</caption>
+      <thead><tr><th>State</th><th class="n">Normal</th><th class="n">With change</th><th class="n">Change</th></tr></thead>
       <tbody>{r.imp.W.map((w) => <tr key={w.id}><td>{w.name}</td><td class="n">{(w.pMean * 100).toFixed(1)} %</td><td class="n">{(w.mMean * 100).toFixed(1)} %</td><td class="n">{sgn(w.dPct, 1)} %</td></tr>)}</tbody>
     </table>);
 }

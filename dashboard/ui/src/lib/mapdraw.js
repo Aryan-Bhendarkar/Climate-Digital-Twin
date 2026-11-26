@@ -106,9 +106,17 @@ export class MapView {
     }
     g.restore();
     this.frame(g);
-    if (s.labels) this.drawLabels(g);
-    for (const hl of s.hlLabels) { const c = P.centers[hl.id]; if (c) this.tag(g, hl.text, c[0], c[1], C.turmeric, true); }
-    if (s.box) this.rect(g, s.box, C.turmeric, [5, 3], 2, true, 'Your change');
+    // Greedy label placement, by priority: "Your change" tag > highlighted state names > place pin > city labels.
+    const placed = [], hit = (b) => placed.some((p) => !(b.x1 < p.x0 || b.x0 > p.x1 || b.y1 < p.y0 || b.y0 > p.y1));
+    if (s.box) { const tb = this.rect(g, s.box, C.turmeric, [5, 3], 2, true, 'Your change'); if (tb) placed.push(tb); }
+    g.font = '600 11.5px "IBM Plex Sans", system-ui';
+    for (const hl of s.hlLabels) {
+      const c = P.centers[hl.id]; if (!c) continue; const tw = g.measureText(hl.text).width;
+      for (const dy of [0, 14, -14, 28]) { const b = { x0: c[0] - tw / 2 - 2, x1: c[0] + tw / 2 + 2, y0: c[1] + dy - 8, y1: c[1] + dy + 8 }; if (!hit(b)) { placed.push(b); this.tag(g, hl.text, c[0], c[1] + dy, C.turmeric, true); break; } }
+    }
+    if (s.place) { const [x, y] = this.px(s.place.lon, s.place.lat); placed.push({ x0: x - 9, x1: x + 9, y0: y - 9, y1: y + 9 }); }
+    if (s.hover) { const [x, y] = this.px(s.hover.lon, s.hover.lat); placed.push({ x0: x - 6, x1: x + 6, y0: y - 6, y1: y + 6 }); }
+    if (s.labels) this.drawLabels(g, placed);
     if (s.dragBox) this.rect(g, s.dragBox, C.ink, [3, 3], 1.4, false);
     if (s.hover) {
       const [x0, y0] = this.px(lon(s.hover.j) - 0.5, lat(s.hover.i) + 0.5), [x1, y1] = this.px(lon(s.hover.j) + 0.5, lat(s.hover.i) - 0.5), [cx, cy] = this.px(s.hover.lon, s.hover.lat);
@@ -141,8 +149,8 @@ export class MapView {
     g.font = `${strong ? 600 : 500} 11.5px "IBM Plex Sans", system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
     g.lineWidth = 4; g.strokeStyle = 'rgba(250,251,250,.92)'; g.strokeText(text, x, y); g.fillStyle = strong ? '#8A5608' : color; g.fillText(text, x, y);
   }
-  drawLabels(g) {
-    const placed = []; g.lineJoin = 'round';
+  drawLabels(g, placed = []) {
+    g.lineJoin = 'round';
     const hit = (b) => placed.some((p) => !(b.x1 < p.x0 || b.x0 > p.x1 || b.y1 < p.y0 || b.y0 > p.y1));
     for (const c of CITIES) {
       const [x, y] = this.px(c.lon, c.lat); g.font = '500 11.5px "IBM Plex Sans", system-ui'; const tw = g.measureText(c.text).width, b = { x0: x - 4, x1: x + 10 + tw, y0: y - 8, y1: y + 8 };
@@ -157,7 +165,11 @@ export class MapView {
     const [x0, y0] = this.px(lon(b.j0) - 0.5, lat(b.i1) + 0.5), [x1, y1] = this.px(lon(b.j1) + 0.5, lat(b.i0) - 0.5);
     if (fill) { g.fillStyle = 'rgba(194,124,14,.08)'; g.fillRect(x0, y0, x1 - x0, y1 - y0); }
     g.strokeStyle = color; g.lineWidth = lw; g.setLineDash(dash); g.strokeRect(x0, y0, x1 - x0, y1 - y0); g.setLineDash([]);
-    if (tagText) { g.font = '600 11px "IBM Plex Sans", system-ui'; const tw = g.measureText(tagText).width + 12, ty = y0 - 18 < MARGIN.t ? y1 : y0 - 18; g.fillStyle = color; g.fillRect(x0, ty, tw, 18); g.fillStyle = '#fff'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(tagText, x0 + 6, ty + 9.5); }
+    if (tagText) { // below the box's bottom-left corner (above it if there is no room)
+      g.font = '600 11px "IBM Plex Sans", system-ui'; const tw = g.measureText(tagText).width + 12, ty = y1 + 18 > MARGIN.t + this.geo.ph ? y0 - 18 : y1; g.fillStyle = color; g.fillRect(x0, ty, tw, 18); g.fillStyle = '#fff'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(tagText, x0 + 6, ty + 9.5);
+      return { x0: x0 - 2, x1: x0 + tw + 2, y0: ty - 1, y1: ty + 19 };
+    }
+    return null;
   }
   drawIso(g, iso) { // iso: [{path:[[lon,lat,lon,lat]...], label}] precomputed segments
     g.strokeStyle = 'rgba(15,37,48,.45)'; g.lineWidth = 0.8; g.beginPath();
