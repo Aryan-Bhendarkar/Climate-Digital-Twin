@@ -92,11 +92,15 @@ class UNet(nn.Module):
 class Emulator(nn.Module):
     """Normalisation + climatology + rain transform + autoregressive rollout. Physical units in and out."""
 
-    def __init__(self, arch: str = "local", width: int = 96, depth: int = 8):
+    def __init__(self, arch: str = "local", width: int = 96, depth: int = 8, rain_head: bool = False):
         super().__init__()
         cin = T_IN * N_CH + N_CH + 2 + 2 + 2      # anomalies(3d) + target-day clim + static + doy + lat/lon
         self.arch, self.width, self.depth = arch, width, depth
-        self.net = LocalNet(cin, N_CH, width, depth) if arch == "local" else UNet(cin, N_CH, width)
+        # optional auxiliary output: logit of P(next-day rain > 10 mm/day). Used only as a training signal
+        # (multi-task learning); inference outputs are unchanged.
+        self.rain_head = rain_head
+        nout = N_CH + int(rain_head)
+        self.net = LocalNet(cin, nout, width, depth) if arch == "local" else UNet(cin, nout, width)
         self.register_buffer("clim_coef", torch.zeros(N_CH, 1 + 2 * N_HARM, H, W))  # model space (tp in log1p)
         self.register_buffer("std", torch.ones(N_CH))         # anomaly std per channel
         self.register_buffer("dstd", torch.ones(N_CH))        # tendency std (normalised anomaly units)
@@ -151,14 +155,20 @@ class Emulator(nn.Module):
             torch.stack([torch.sin(ang_t), torch.cos(ang_t)], 1)[:, :, None, None].expand(B, 2, H, W),
             self.latlon.expand(B, -1, -1, -1),
         ], 1)
-        return hist[:, -1] + self.net(feats) * self.dstd[None, :, None, None]
+        o = self.net(feats)
+        nxt = hist[:, -1] + o[:, :N_CH] * self.dstd[None, :, None, None]
+        self._rain_logit = o[:, N_CH] if self.rain_head else None
+        return nxt
 
     def rollout_anom(self, hist: torch.Tensor, ang_last: torch.Tensor, steps: int) -> torch.Tensor:
-        out = []
+        out, logits = [], []
         for k in range(steps):
             nxt = self.step(hist, ang_last + 2 * math.pi * k / 365.0)
             out.append(nxt)
+            if self.rain_head:
+                logits.append(self._rain_logit)
             hist = torch.cat([hist[:, 1:], nxt[:, None]], 1)
+        self.rain_logits = torch.stack(logits, 1) if logits else None     # [B,steps,H,W] (training only)
         return torch.stack(out, 1)                                       # [B,steps,6,H,W]
 
     @torch.no_grad()
@@ -177,7 +187,8 @@ class Emulator(nn.Module):
 def load_emulator(path, map_location="cpu") -> "Emulator":
     """Build an Emulator from a checkpoint saved by training/train.py (older checkpoints without 'gain' -> gain = 1)."""
     ck = torch.load(path, map_location=map_location, weights_only=False)
-    m = Emulator(arch=ck.get("arch", "local"), width=ck.get("width", 96), depth=ck.get("depth", 8))
+    m = Emulator(arch=ck.get("arch", "local"), width=ck.get("width", 96), depth=ck.get("depth", 8),
+                 rain_head=ck.get("rain_head", False))
     sd = dict(ck["state_dict"])
     sd.setdefault("gain", torch.ones(MAX_LEAD, N_CH))
     m.load_state_dict(sd)

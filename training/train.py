@@ -71,7 +71,7 @@ def ref_mse(a: np.ndarray, tr: np.ndarray, kmax: int, w_lat: np.ndarray) -> np.n
 def save(model, args, log, path):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     torch.save({"state_dict": model.state_dict(), "arch": args.arch, "width": args.width, "depth": args.depth,
-                "args": vars(args), "log": log}, path)
+                "rain_head": model.rain_head, "args": vars(args), "log": log}, path)
 
 
 def main():
@@ -90,6 +90,8 @@ def main():
     ap.add_argument("--noise", type=float, default=0.02, help="input noise (normalised std) in the 1-step stage")
     ap.add_argument("--t2m-shift", type=float, default=0.7, help="random +-K offset on t2m (warm-year robustness)")
     ap.add_argument("--ema", type=float, default=0.999)
+    ap.add_argument("--rain-head", type=float, default=0.0,
+                    help=">0: add an auxiliary heavy-rain (>10 mm/day) classification head trained with focal loss of this weight")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
@@ -104,7 +106,7 @@ def main():
     kmax = max(k for k, _ in stages)
     REF = torch.tensor(ref_mse(P["a"], P["tr"], kmax, w_lat_np), device=dev, dtype=torch.float32)   # [kmax,6]
 
-    model = Emulator(arch=args.arch, width=args.width, depth=args.depth).to(dev)
+    model = Emulator(arch=args.arch, width=args.width, depth=args.depth, rain_head=args.rain_head > 0).to(dev)
     model.clim_coef.copy_(torch.tensor(P["coef"])); model.std.copy_(torch.tensor(P["std"], dtype=torch.float32))
     model.dstd.copy_(torch.tensor(P["dstd"], dtype=torch.float32)); model.static.copy_(torch.tensor(P["static"]))
     ema = copy.deepcopy(model).eval()
@@ -151,6 +153,15 @@ def main():
                     tp_true = torch.expm1(target[:, :, TP] * model.std[TP] + clim_tp)
                     w[:, :, TP] *= 1 + args.heavy_weight * (tp_true > 10.0).float()
                 loss = (w * (pred - target) ** 2).mean()
+                if args.rain_head > 0:                        # focal BCE on heavy-rain occurrence, lat-weighted
+                    angs2 = ANG[tb][:, None] + 2 * math.pi * kk[None] / 365.0
+                    clim_tp2 = model.clim(angs2.reshape(-1))[:, TP].reshape(len(tb), K, 32, 36)
+                    heavy = (torch.expm1(target[:, :, TP] * model.std[TP] + clim_tp2) > 10.0).float()
+                    lg = model.rain_logits
+                    pt = torch.sigmoid(lg) * heavy + (1 - torch.sigmoid(lg)) * (1 - heavy)
+                    bce = torch.nn.functional.binary_cross_entropy_with_logits(lg, heavy, reduction="none")
+                    focal = ((1 - pt) ** 2 * bce * w_lat[:, :, 0]).mean()
+                    loss = loss + args.rain_head * focal
                 opt.zero_grad(set_to_none=True)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
