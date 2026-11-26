@@ -3,11 +3,96 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Monsoon Multiverse — India Climate Digital Twin</title>
+<title>Monsoon Multiverse — an AI twin of India's weather</title>
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/story.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%2338bdf8'/%3E%3C/svg%3E">
 </head>
-<body>
+<body data-view="story">
+<div id="story">
+  <header class="s-head">
+    <div class="s-brand">
+      <span class="s-logo" aria-hidden="true"></span>
+      <div><h1>Monsoon Multiverse</h1><p class="s-tag">An AI twin of India's weather &mdash; see the next 10 days, then ask &ldquo;what if?&rdquo;</p></div>
+    </div>
+    <div class="s-badges">
+      <span class="s-badge" id="bOffline" title="Nothing is downloaded or sent anywhere: the model runs on this computer.">Runs fully offline</span>
+      <span class="s-badge" id="bSpeed" title="Time the model needs to compute a full 10-day forecast of India.">~0.2 s per forecast</span>
+      <span class="s-badge warm" id="bHealth" title="Is the forecasting model running?">connecting&hellip;</span>
+      <button class="s-btn ghost" id="btnExpert" title="Switch to the detailed scientist dashboard with three maps, charts and tables">Expert view</button>
+    </div>
+  </header>
+  <div class="s-banner" id="sBanner" hidden>
+    <span id="sBannerTxt"></span>
+    <input id="sServer" aria-label="Model server address" spellcheck="false" title="Address of the model server">
+    <button class="s-btn small" id="sRetry">Retry</button>
+  </div>
+  <div class="s-body">
+    <section class="s-stage" aria-label="Map of India">
+      <div class="s-cap"><h2 id="capTitle">Temperature, day 1 of 10</h2><p id="capSub"></p></div>
+      <div class="s-seg" id="segMode" role="group" aria-label="Which forecast to show on the map">
+        <button data-mode="normal" class="on" title="The AI's forecast if nothing unusual happens">Normal forecast</button>
+        <button data-mode="whatif" disabled title="The forecast after your what-if. Choose a what-if in step 2 first.">What-if</button>
+        <button data-mode="diff" disabled title="What-if minus normal: where and how much your what-if changes the weather. Choose a what-if in step 2 first.">Difference</button>
+      </div>
+      <div class="s-mapwrap" id="sMapWrap"><canvas id="sMap" aria-label="Map of India showing the forecast"></canvas><div class="s-busy" id="sBusy" hidden><i></i><span id="sBusyTxt">Running the AI&hellip;</span></div></div>
+      <div class="s-legend" id="sLegend"></div>
+    </section>
+    <aside class="s-steps" id="sSteps">
+      <section class="s-step" id="step1">
+        <h3><b>1</b> The forecast</h3>
+        <p class="s-lead">Pick a start date and press play: the AI forecasts India's next 10 days.</p>
+        <label class="s-field"><span>Start date (the AI sees the 3 days up to it)</span>
+          <select id="selDate" title="A real past situation to start from. The AI sees only the 3 days up to this date."></select></label>
+        <div class="s-field"><span>Show on the map</span><div class="s-chips" id="chipVar" role="group" aria-label="What to show on the map"></div></div>
+        <div class="s-play">
+          <button class="s-btn primary" id="sPlay" title="Play the 10-day forecast (Space)">&#9654; Play forecast</button>
+          <div class="s-slider"><input type="range" id="sDay" min="1" max="10" value="1" step="1" aria-label="Forecast day" title="Drag to move through the 10 forecast days (arrow keys work too)">
+            <div class="s-ticks"><span>Day 1</span><b id="dayNow">Day 1</b><span>Day 10</span></div></div>
+        </div>
+      </section>
+      <section class="s-step" id="step2">
+        <h3><b>2</b> Ask what-if</h3>
+        <p class="s-lead">Change the weather in one region and see how India reacts. Click a card.</p>
+        <div class="s-cards" id="cards"></div>
+        <div class="s-custom" id="custom" hidden>
+          <label class="s-field"><span>What changes</span><select id="cuWhat" title="Which weather quantity you want to change"></select></label>
+          <label class="s-field"><span>By how much</span><div class="s-amt"><input type="range" id="cuAmt" title="How strongly to change it"><output id="cuOut"></output></div></label>
+          <label class="s-field"><span>Where</span><select id="cuWhere" title="Region to change. You can also drag a box directly on the map."></select></label>
+          <p class="s-hint">Tip: drag a box on the map to choose your own region.</p>
+          <button class="s-btn primary" id="cuRun" title="Run the AI twice, with and without your change">Run my what-if</button>
+        </div>
+        <p class="s-sum" id="scSum" hidden></p>
+      </section>
+      <section class="s-step dim" id="step3">
+        <h3><b>3</b> What changes for India</h3>
+        <div id="impactEmpty" class="s-empty">Pick a what-if in step 2. The map will then show where the weather changes, and what it means for farms, heat and wind power.</div>
+        <div id="impact" hidden>
+          <p class="s-if" id="hdIf"></p>
+          <p class="s-headline" id="hdMain"></p>
+          <div class="s-impacts">
+            <article class="s-imp" id="impFarm"><h4>Farmers <span>Kharif sowing</span></h4><div class="s-big" id="farmBig"></div><p id="farmTxt"></p><button class="s-link" data-open="kharif" title="Open the full state-by-state table in the Expert view">details</button></article>
+            <article class="s-imp" id="impHeat"><h4>Heat risk</h4><div class="s-big" id="heatBig"></div><p id="heatTxt"></p><button class="s-link" data-open="kharif" title="Open the full state-by-state table in the Expert view">details</button></article>
+            <article class="s-imp" id="impWind"><h4>Wind power</h4><div class="s-big" id="windBig"></div><p id="windTxt"></p><button class="s-link" data-open="wind" title="Open the wind-power table in the Expert view">details</button></article>
+          </div>
+        </div>
+      </section>
+      <details class="s-trust" id="trust">
+        <summary title="Four quick checks that the AI behaves like real weather">Why trust it?</summary>
+        <ul>
+          <li><b id="tLocal">&ndash;</b><span>of the change stays where you applied it on day 1. The AI does not smear it across the whole country.</span></li>
+          <li><b>~900 km</b><span>per day is the most a change can travel (8 grid cells), like real weather systems.</span></li>
+          <li><b id="tNull">&ndash;</b><span id="tNullTxt">No change in &rarr; exactly the same forecast out.</span> <button class="s-link" id="sNull" title="Send a do-nothing change and check the forecast is identical">test again</button></li>
+          <li><b>24 %</b><span>more accurate than &ldquo;tomorrow = today&rdquo; on day 1, on years held out of training (2019&ndash;21). The final model was then retrained on all years.</span></li>
+        </ul>
+        <div class="s-ripple"><canvas id="cvTrust"></canvas></div>
+        <p class="s-cap2" id="trustCap">Run a what-if to see how the change spreads. Blue: change inside your area. Orange: change elsewhere. It starts small and grows slowly day by day: it spreads outward instead of jumping.</p>
+      </details>
+    </aside>
+  </div>
+  <div class="s-tip" id="sTip" hidden></div>
+</div>
+<div id="expert" hidden>
 <header class="top">
   <div class="brand"><span class="logo"></span><h1>Monsoon Multiverse <em>— India Climate Digital Twin</em></h1></div>
   <div class="chips">
@@ -15,6 +100,7 @@
     <span class="chip" id="chipHealth"><i></i><span id="healthTxt">checking…</span></span>
     <label class="srv" title="Model server base URL"><input aria-label="Server URL" id="serverUrl" value="http://127.0.0.1:8000" spellcheck="false"></label>
     <button class="btn ghost" id="btnHow" title="How it works (?)">How it works</button>
+    <button class="btn primary" id="btnStory" title="Back to the guided Story mode">Story mode</button>
   </div>
 </header>
 
@@ -91,6 +177,7 @@
   </div>
 </main>
 </div>
+</div><!-- /#expert -->
 
 <div class="tooltip" id="tip" hidden></div>
 <div class="toasts" id="toasts"></div>
@@ -110,6 +197,6 @@
   </ul>
 </div></div>
 
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/story.js"></script>
 </body>
 </html>

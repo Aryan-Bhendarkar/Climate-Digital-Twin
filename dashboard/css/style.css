@@ -103,3 +103,5 @@ tbody tr:nth-child(even){background:#141c2d}tbody tr:hover{background:#1c2740}
 @media (min-width:1700px){body{font-size:15px}.side{width:340px}.mapwrap{max-height:48vh}}
 @media (max-width:980px){.layout{flex-direction:column;overflow:auto}.side{width:auto;border-right:none}body{overflow:auto}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+#expert{display:flex;flex-direction:column;flex:1;min-height:0}
+#expert[hidden]{display:none}

@@ -353,6 +353,7 @@ async function init() {
   document.querySelectorAll('#tabs button').forEach((b) => (b.onclick = () => selectTab(b.dataset.tab)));
   $('btnHow').onclick = () => ($('modal').hidden = false); $('btnClose').onclick = () => ($('modal').hidden = true); $('modal').onclick = (e) => { if (e.target.id === 'modal') $('modal').hidden = true; };
   window.addEventListener('keydown', (e) => {
+    if (document.body.dataset.view !== 'expert') return;
     if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && e.key !== 'Escape') return;
     if (e.key === ' ') { e.preventDefault(); play(!S.playing); }
     else if (e.key === 'ArrowRight') setDay(S.day + 1); else if (e.key === 'ArrowLeft') setDay(S.day - 1);
@@ -366,4 +367,14 @@ async function init() {
   checkOffline(); await checkHealth();
   await loadSample(idx[0].file); checkOffline();
 }
-init().catch((e) => { console.error(e); toast('Dashboard failed to start: ' + e.message); });
+export const ready = init().catch((e) => { console.error(e); toast('Dashboard failed to start: ' + e.message); });
+
+/** Story mode hands its live state to the expert view (same rollouts, no recomputation). */
+export function adopt(o) {
+  Object.assign(S, { init: o.init, doy: o.doy, name: o.name, prime: o.prime, mv: o.mv || null, msP: o.msP, msM: o.msM || null, mvInit: o.mvInit || null, shock: o.shock || null, rip: null });
+  S.box = o.box || S.box; S.comps = o.comps && o.comps.length ? o.comps.map((c) => ({ ...c })) : S.comps;
+  if (o.file) $('selSample').value = o.file;
+  $('selPreset').value = o.mv ? 'custom' : $('selPreset').value;
+  updateBoxUI(); renderComps(); afterNewData(); setMs();
+  if (o.tab) selectTab(o.tab);
+}

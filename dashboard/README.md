@@ -1,24 +1,51 @@
 # Monsoon Multiverse — dashboard
 
-Interactive map dashboard + impact module for the India climate digital twin. Pure static HTML + ES modules + Canvas 2D:
-no build step, no npm, no CDN, no map tiles, **zero external requests** (the header chip counts them live).
-Every number on screen comes from live calls to the model server's `POST /simulate`; only the 3-day *input* states in
-`samples/` and geography/climate statistics in `assets/` are shipped.
+An AI twin of India's weather: see the next 10 days, then ask "what if?". Pure static HTML + ES modules + Canvas 2D:
+no build step, no npm, no CDN, no fonts or map tiles from the internet, **zero external requests**.
+Every number on screen comes from live calls to the model server (`js/api.js`; Normal and What-if forecasts run in parallel);
+only the 3-day *input* states in `samples/` and geography/climate statistics in `assets/` are shipped. Total size < 1 MB.
 
 ## Run
 
 ```bash
 # terminal 1 – model server (repo root)
-cd repo && python serve.py --port 8000
-# terminal 2 – dashboard
-cd repo/dashboard && python -m http.server 8080
-# open http://localhost:8080
+python serve.py --port 8000
+# terminal 2 – dashboard + API forwarding on one port
+python dashboard/devserver.py --port 8080      # add --model http://127.0.0.1:8010 if the model server uses another port
+# open http://127.0.0.1:8080/?server=api
 ```
 
-Server URL defaults to `http://localhost:8000` (editable in the header, remembered in localStorage; CORS is enabled in `serve.py`).
-A health chip shows whether the server is ready; errors appear as toasts.
+`?server=api` uses the same-origin forwarder in `devserver.py`; `?server=http://host:port` or the retry box in the red banner
+set another address (remembered in localStorage). `?view=expert` opens the Expert view directly.
 
-## Using it
+## Story mode (default): what each step shows
+
+One big India map on the left, three numbered steps on the right.
+
+| Step | What the viewer sees and does |
+|---|---|
+| **1 The forecast** | Pick a start date in plain words ("28 May 2020 — monsoon arriving in Kerala"), pick what to show (Temperature °C, Rainfall mm/day, Wind km/h, Humidity (water vapour), Pressure hPa), press **Play forecast** or drag the Day 1 … Day 10 slider. The legend is in words ("Redder = hotter"). Hover the map for values. |
+| **2 Ask what-if** | Five scenario cards (Bay of Bengal +3 °C, monsoon winds −40 %, Arabian Sea +2.5 °C, dry air over Rajasthan, low pressure over Bengal) and **Draw your own** (what, how much with units and sensible ranges, where: a named region or a box dragged on the map). A click runs the model twice in parallel (normal and what-if); the shocked region is outlined on the map. |
+| **3 What changes for India** | The same map switches between **Normal forecast / What-if / Difference** (diverging colours, white = no change). An auto-written headline (from `js/impact.js` logic on the two live rollouts) and three cards: Farmers (Kharif sowing), Heat risk, Wind power. Each has a **details** link that opens the full table in the Expert view. |
+| **Why trust it?** | Collapsed strip. Live day-1 local share, the 8-cell/day (~900 km) reach limit, a live null-change test (identical forecast), the validation accuracy gain, and the per-day spread chart with a plain caption. |
+
+Notes on the plain-language numbers
+* Headline and cards ignore the two tiny groups "Islands" and "Small UTs" (not farming regions); the Expert tables still list them.
+* "Extra hot days" = days a state's mean temperature exceeds the usual hottest 5 % (P95) for that month (`assets/heat_p95.json`).
+* Wind power = capacity-factor proxy of a generic turbine for the 6 windiest states; only the change is meaningful.
+* "24 % more accurate than tomorrow = today" is the day-1 skill measured in the validation run that held out 2019-21; the submitted model was then retrained on all years.
+* The 900 km figure is the architecture limit (8 grid cells of 1 degree per day), not a measurement.
+* Rainfall and humidity difference maps use brown (less) / green (more) because blue-for-drier is confusing next to rain maps; temperature, wind and pressure use blue (less) / red (more).
+
+## Expert view
+
+The **Expert view** button (top right) opens the original scientist dashboard unchanged: three synced maps (Timeline Prime, Multiverse, Δ),
+ripple chart, cell series, Kharif Stress Monitor, Wind-power index, shock painter, null-shock check. **Story mode** (top right there) returns.
+Opening it passes the current live rollouts across, so nothing is recomputed. The previous documentation follows.
+
+---
+
+## Expert view: using it
 
 | Action | How |
 |---|---|
@@ -51,8 +78,8 @@ Indicative, not forecasts: 1° daily grid, daily-mean temperature (not Tmax), ra
 ## Layout
 
 ```
-index.html  css/style.css
-js/  main.js (UI/state)  api.js  render.js (canvas maps)  chart.js (own line chart)  colormaps.js  shock.js  impact.js  util.js
+index.html  css/style.css (expert)  css/story.css (story)
+js/  story.js (Story mode, default)  main.js (Expert view, loaded on demand)  api.js  render.js (canvas maps)  chart.js (own line chart)  colormaps.js  shock.js  impact.js  util.js
 assets/  outlines.json  grid_states.json  heat_p95.json  rain_clim.json
 samples/ *.json (5 demo initial conditions + index.json)
 build_assets.py   offline asset builder (not part of the server)
