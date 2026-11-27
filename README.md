@@ -38,7 +38,7 @@ Built for **Yugaantar DevForge, Track 2: “Multiverse of Monsoon,”** the proj
 
 ## Demo
 
-The compressed walkthrough is [`project-demo-compressed.mp4`](project-demo-compressed.mp4) (about 2.9 MB).
+https://github.com/user-attachments/assets/cce7db3f-3ae8-4139-af74-d28bc9ea8d9c
 
 ## Quick start
 
