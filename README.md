@@ -1,96 +1,204 @@
-# Monsoon Multiverse: an India climate digital twin
+# Monsoon Multiverse
 
-**Yugaantar DevForge, Track 2 "Multiverse of Monsoon".**
-This is a fast, deterministic emulator of India's daily weather whose shock responses are local and travel at a bounded speed. From the last 3 days of state it rolls the atmosphere forward day by day (**Timeline Prime**). It also branches into **Multiverses** when you inject a localised shock, such as a warmer Bay of Bengal or a stalled monsoon wind, so you can watch the ripple spread across India. An offline dashboard and an impact module turn the branches into consequences for Kharif agriculture and wind power.
+<p align="center"><strong>An offline climate digital twin for India's monsoon - forecast the next 10 days, then explore what-if scenarios.</strong></p>
 
+<p align="center">
+  <a href="#quick-start">Quick start</a> · <a href="#architecture">Architecture</a> · <a href="#dashboard">Dashboard</a> · <a href="#validation">Validation</a> · <a href="#limitations">Limitations</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/PyTorch-CPU%20%2F%20CUDA-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch">
+  <img src="https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Mode-offline%20first-2E7D32" alt="Offline first">
+  <img src="https://img.shields.io/badge/License-MIT-blue" alt="MIT License">
+</p>
+
+> [!IMPORTANT]
+> This is a scenario-exploration and research tool, not an operational weather-warning, agricultural-advisory, or emergency-response system.
+
+## Overview
+
+**Monsoon Multiverse** is a fast, deterministic emulator of daily weather over India. Starting from three days of atmospheric state, it produces a baseline **Timeline Prime** forecast. Apply a local perturbation - for example warmer Bay of Bengal air or stalled monsoon winds - and it creates a **Multiverse** branch, making the modeled response and its spread visible.
+
+Built for **Yugaantar DevForge, Track 2: “Multiverse of Monsoon,”** the project is offline-first: trained weights, samples, static map assets, fonts, FastAPI service, and dashboard are shipped in this repository.
+
+| Capability | What it provides |
+| --- | --- |
+| Forecasting | 10-day daily rollouts for six surface variables on a 1-degree India grid |
+| Counterfactuals | Local temperature, humidity, wind, pressure, and rainfall shocks |
+| Bounded causality | Responses can travel at most 8 grid cells per simulated day by design |
+| Explainable exploration | Prime/Multiverse maps, timeline fork, ripple checks, and place-level views |
+| Impact signals | Kharif stress comparison and wind-power proxy, live from model output |
+
+## Demo
+
+The compressed walkthrough is [`project-demo-compressed.mp4`](project-demo-compressed.mp4) (about 2.9 MB).
+
+## Quick start
+
+### 1. Create an environment
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
-repo/
-├── serve.py              # offline inference server (FastAPI): POST /health, POST /simulate
-├── monsoon/model.py      # the emulator (network + climatology + rollout); only module the server imports
-├── training/train.py     # training pipeline (1-step, then unrolled multi-day curriculum)
-├── training/calibrate.py # per-lead output calibration (fit on training years)
-├── training/make_ensemble.py # packs calibrated seed runs into one weights file
-├── tools/model_adapter.py# in-process adapter used by our evaluation scripts
-├── weights/emulator.pt   # trained weights (plain ~18 MB file, 3 seed members); includes normalisation, climatology + calibration
-├── dashboard/            # offline web dashboard + impact module (separate from the server)
-├── TRAINING.md           # runbook: train, evaluate, serve
-└── docs/Monsoon_Multiverse_Brief.pdf  # the 2-page project brief
+
+> Linux/macOS: use `source .venv/bin/activate`.
+
+### 2. Start the model server
+
+From the repository root:
+
+```powershell
+python serve.py --port 8000
 ```
 
-## Quick start (offline)
-```bash
-pip install torch numpy fastapi uvicorn        # runtime deps (torch CPU is enough)
-python serve.py --port 8000                     # listens on 0.0.0.0; /health is ready in ~4 s
-# dashboard (second terminal): serves the page and forwards /api/* to the model server on one port
-cd dashboard && python devserver.py             # open http://127.0.0.1:8080/?server=api
+The service listens at `http://127.0.0.1:8000`; use `POST /health` to check readiness.
+
+### 3. Start the dashboard
+
+In a second terminal at the repository root:
+
+```powershell
+python dashboard/devserver.py --port 8080
 ```
-Self-check (no data needed): `python tests/test_contract.py` (determinism, null shock, 8-cell/day reach, output guards).
-`/simulate` takes `{"init_states":[3,6,32,36], "doy_sincos":[sin,cos], "steps":10, "perturbation":null|[6,32,36]}` in physical units. It returns `{"rollout":[steps,6,32,36], "inference_ms":...}`. A 10-day rollout takes about 0.5–1 s on 4 CPU cores (three ensemble members run side by side, each on one core).
 
-**Tested like the judging sandbox:** fresh clone, clean Python 3.12 with only torch (CPU), numpy, fastapi and uvicorn, network switched off, 4 cores: the kit's schema validator passes, `/health` is ready in ~4 s, `/simulate` takes ~0.6 s for 10 days (~1.5 s for 30), peak memory ~0.85 GB.
+Open [http://127.0.0.1:8080/?server=api](http://127.0.0.1:8080/?server=api). The dashboard forwards `/api/*` to the model server, retaining a single browser origin. Add `?view=expert` for the scientific interface.
 
-## How the model works
-| Piece | Choice | Why |
-|---|---|---|
-| State | Anomaly from a smooth seasonal climatology (3 Fourier harmonics per grid cell and variable, fitted on training years, stored as model weights) | The net learns *weather*, not the calendar. At long leads it relaxes toward a sensible seasonal state instead of drifting. There is no per-day lookup table. |
-| Rain | Modelled in `log1p` space | Heavy-tailed rain becomes learnable. Output guards keep rain ≥ 0, water vapour ≥ 0 and 2 m temperature inside 233–333 K (the contract's validity range; never reached in normal rollouts). |
-| Step | Predicts the 1-day **tendency** (residual) | The identity path keeps fine structure, which fights blur, and a shock's day-1 response starts exactly where it was applied. |
-| Network | 8 residual blocks (width 96), each with exactly **one 3×3 convolution** and per-cell normalisation (~1.5 M parameters per member) | Receptive field = **8 grid cells per simulated day in any direction** (~900 km north–south or east–west, up to ~1,250 km diagonally): a hard upper bound by construction, so a shock can never jump across the map (measured response beyond that radius: exactly 0). Real responses spread more slowly. There is no global attention, FFT or batch-wide statistic. |
-| Inputs | Anomalies of the last 3 days, target-day seasonal signal, land–sea mask, orography, day-of-year, lat/lon | Static geography lets the net learn the Western Ghats, the Himalaya and the coastlines. |
-| Training | 1-step, then **unrolled 2 → 4-day** rollouts with full back-propagation, EMA weights | The model is trained on its own forecasts, so it learns to correct its errors instead of compounding them (anti-drift). Going on to 8–10-day rollouts fit the training years better but scored worse on held-out years, so we stop at 4. |
-| Calibration | One least-squares gain per lead and variable on the output anomaly (~50 numbers, fit on training years). Rain is not scaled. | Long leads shrink toward the seasonal climate exactly as much as the training data supports (like MOS post-processing). |
-| Loss | Latitude-weighted MSE per variable and lead, **divided by the error of the best reference** (persistence or climatology), ×2 at days 1/4/8, heavy-rain (>10 mm/day) cells up-weighted | Optimises exactly what matters: beating "repeat yesterday" and climatology, including heavy rain. |
-| Robustness | Random ±0.7 K temperature offsets during training | 2023–24 is warmer than the 2005–2021 training period. |
-| Ensemble | Three copies of the same recipe trained with different random seeds; the server averages their forecasts | Averaging cancels part of each copy's own errors and steadies the size of shock responses: on held-out years 3 copies scored +4 (5 named windows) to ~+8 (217 windows) points (strict) over the best single copy. Every copy is local and deterministic, so the average is too. |
-| Determinism | No dropout or noise at inference, deterministic kernels | A zero shock returns a bit-identical forecast. |
+### 4. Verify the installation
 
-## Evaluation (held-out 2019–2021)
-**Protocol.** The same recipe was trained on 2005–2018 only and tested on 2019–2021, which it never trained on (recipe choices such as rollout length and ensemble size were selected on these years, so the numbers are mildly optimistic), using a local copy of the organisers' published scoring functions. The submitted weights use that same recipe retrained on all of 2005–2021, so they cannot be scored on 2019–21 themselves. The hidden 2023–24 windows are the real test.
+```powershell
+python tests/test_contract.py
+node --test dashboard/tests/*.test.mjs
+```
 
-Skill = 1 − RMSE / RMSE of the better reference (persistence or day-of-year climatology), chosen **per lead day** (the strict reading), latitude-weighted, computed per window and averaged over 217 windows (every 5th day of 2019–21) and the 6 variables, as the organisers' scoring functions do:
+The server is designed to be ready in roughly four seconds. A 10-day ensemble rollout typically takes about 0.5-1 second on four CPU cores.
 
-| Lead | Skill vs better reference | Skill vs persistence ("tomorrow = today") |
-|---|---|---|
+## Architecture
+
+```mermaid
+flowchart LR
+    A[Last 3 daily states] --> B[Seasonal climatology<br/>+ static geography]
+    B --> C[Local residual emulator<br/>8 residual blocks]
+    C --> D[Timeline Prime<br/>baseline rollout]
+    A --> E[Localized perturbation]
+    E --> C
+    C --> F[Multiverse<br/>counterfactual rollout]
+    D --> G[Prime vs Multiverse]
+    F --> G
+    G --> H[Dashboard, ripple checks,<br/>Kharif and wind indicators]
+```
+
+The emulator predicts a one-day **tendency** rather than replacing each state. It learns anomalies relative to a smooth seasonal climatology (three Fourier harmonics per grid cell and variable), so longer simulations relax toward a sensible seasonal state instead of drifting.
+
+```mermaid
+flowchart TD
+    I[3-day anomalies, calendar,<br/>land/sea, orography, lat/lon] --> R[Residual block 1]
+    R --> R2[... 8 local 3x3 convolution blocks ...]
+    R2 --> T[One-day tendency]
+    T --> U[Physical output guards]
+    U --> V[Next daily state]
+    V --> W[Repeat for 10-day rollout]
+```
+
+| Design choice | Rationale |
+| --- | --- |
+| 8 local residual blocks, width 96 | 3x3 convolutions impose a hard maximum reach of 8 cells/day; there is no global attention, FFT, or batch-wide statistic. |
+| `log1p` rainfall target | Makes heavy-tailed rainfall easier to learn while guards keep rainfall and water vapour non-negative. |
+| Unrolled training | One-step training progresses to 2- and 4-day rollouts, teaching the model to correct its own errors. |
+| Three-seed ensemble | Averages deterministic local models to reduce member-specific error and stabilize shock magnitude. |
+| Per-lead calibration | Least-squares anomaly gains shrink longer leads toward climatology; rainfall is not scaled to preserve heavy-rain signals. |
+
+### API contract
+
+`POST /simulate` accepts initial physical states, calendar signal, forecast length, and an optional perturbation:
+
+```json
+{
+  "init_states": "[3, 6, 32, 36] physical-unit tensor",
+  "doy_sincos": [0.0, 1.0],
+  "steps": 10,
+  "perturbation": null
+}
+```
+
+It returns a rollout shaped `[steps, 6, 32, 36]` and inference timing. A zero shock produces a bit-identical baseline forecast.
+
+## Dashboard
+
+The default **Forkline** experience shows a 3D relief map and a timeline that divides into Prime and Multiverse paths. Move and zoom the map, select a place, tune a scenario, compare branches, or trace the response limit day by day. WebGL2 enables the 3D map; `?flat=1` forces a 2D fallback.
+
+| View or tool | Purpose |
+| --- | --- |
+| Change / Prime / Multiverse / Compare | Inspect deltas, either branch, or both with a draggable divider. |
+| What if | Use common or extreme presets, or build a custom localized shock. |
+| Influence | Runs systematic local changes to show which areas affect a chosen place. |
+| Proof | Shows held-out skill, timing, request count, live checks, and scenario JSON. |
+| Expert view | Scientific interface with synchronized maps, cell series, shock painter, ripple tab, and null-shock check. |
+
+### Impact indicators
+
+All impact figures are calculated live from paired `/simulate` responses.
+
+- **Kharif Stress Monitor:** 10-day rainfall change, longest dry spell, heat-stress days, and an overall state/UT stress tier.
+- **Wind-power index:** capacity-factor proxy for six major wind states using 10 m wind extrapolated to hub height and a generic turbine curve.
+- **Watch levels:** scenario-comparison thresholds for rain, temperature, and wind; informational only, never public warnings.
+
+## Validation
+
+The validation recipe trains on **2005-2018** and evaluates the held-out **2019-2021** period. Submitted weights are retrained on all **2005-2021** data, so final weights are not scored against their own training years.
+
+| Lead time | Skill vs best reference | Skill vs persistence |
+| --- | ---: | ---: |
 | Day 1 | **+0.32** | +0.34 |
 | Day 4 | **+0.07** | +0.26 |
-| Day 8 | −0.01 (level with climatology) | +0.24 |
+| Day 8 | -0.01 | +0.24 |
 
-(Pooling the RMSE over all windows before taking the ratio gives +0.36 / +0.13 / +0.03.)
+Skill is `1 - RMSE / RMSE(best of persistence or day-of-year climatology)`, latitude-weighted and assessed per lead. Held-out checks also report heavy-rain CSI of 0.29 (vs 0.19 persistence), preserved spatial variance, deterministic null shocks, and localized day-1 shock response.
 
-- Heavy-rain (>10 mm/day) CSI, mean over the scored leads: 0.29, against 0.19 for persistence and 0.16 for climatology.
-- Day-8 spatial variance stays at 0.71–1.00 of the truth per variable over 217 windows (0.53–1.03 on the 5 named windows; single windows can dip to ~0.3 for rain), against an anti-blur gate of ≥ 0.40.
-- Null shock: bit-identical forecast. Day-1 shock response: ≥ 99 % within 3 cells of the shocked box.
-- Our grader totals, out of 70 (automated forecast + blur + causality parts): about 61–67 on the strict reading and 70 on the lenient one (single copies: 51–57 strict on the named windows). How the official grader combines lead days is not published, so we optimised for the stricter reading.
+## Reproduce training
 
-**Reproduce the submitted weights:**
+Training data lives outside the repository and must not be committed. From the project root:
+
 ```bash
 for s in 0 1 2; do
   python training/train.py --data ../data/india_climate_train.nc --train-end 2021 --width 96 --depth 8 \
-      --stages 1:40,2:10,4:10 --lrs 1e-3,3e-4,2e-4 --seed $s --out runs/seed$s.pt --device cuda
+    --stages 1:40,2:10,4:10 --lrs 1e-3,3e-4,2e-4 --seed $s --out runs/seed$s.pt --device cuda
   python training/calibrate.py --ckpt runs/seed$s.pt --data ../data/india_climate_train.nc --train-end 2021 --stride 4
 done
 python training/make_ensemble.py --out weights/emulator.pt runs/seed0.pt runs/seed1.pt runs/seed2.pt
 ```
-Each seed takes about 45 min on one T4 GPU (about 75 min on a 4 GB laptop GPU). Use `--train-end 2018` for the validation model.
 
-## Impact module (dashboard)
-**Kharif Stress Monitor.** Per state, comparing Prime vs Multiverse:
-- 10-day rainfall change of the what-if vs our own normal forecast, banded with IMD-style thresholds (±19 % normal, −20 to −59 % deficient, ≤ −60 % large deficient, ≥ +20 % excess). Note that IMD's own bands are relative to the long-period average, not to a forecast.
-- longest dry spell
-- heat-stress days: the state-mean daily-mean temperature above that state's monthly 95th percentile (absolute IMD thresholds need daily maximum temperature, which the data lacks). Meaningful for days 1–3; later the forecast is too smooth to cross the threshold.
-- an overall stress tier
+See [`TRAINING.md`](TRAINING.md) for calibration, grading, validation, and GPU runbook details.
 
-There is also a **wind-power index** for the six major wind states (10 m wind → hub height by a 1/7 power law, generic 3/12/25 m/s turbine curve). Every number is computed live from our own `/simulate` output.
+## Repository map
 
-## Limitations (honest)
-- 1° daily grid, 6 surface variables: no SST, no upper air, no boundary inflow from outside the box. The edges are the least reliable.
-- Day 8–10 forecasts are about as good as climatology. The weather part of the forecast is deliberately damped there, so the map keeps its seasonal structure but little day-to-day detail.
-- Rain is the hardest variable. Heavy-rain cores are often 1–2 cells off. A strong ocean-warming shock can trigger a large local rain response (> 5 σ in ~5 % of shocked runs on held-out years).
-- Shock responses are learned statistical associations, not a physics solver: there is no water or energy conservation. Across 25 start-date × preset what-ifs in the dashboard, 7 responses read as physically plausible, 12 were weak or mixed and 6 had an unexpected sign; strong responses near the shocked box are the most trustworthy, and sizes are hypotheses (single seeds can differ ~3× in magnitude; the 3-seed average is steadier). Wind-only shocks fade within ~3 days. A shock far beyond the 2005–2021 range is extrapolation.
-- The impact indicators are scenario-comparison tools on a 1° grid, not validated agricultural advisories.
-- State boundaries in the dashboard are Natural Earth (public domain), indicative only.
+```text
+.
+├── serve.py                 # FastAPI inference server
+├── monsoon/model.py         # emulator, climatology, rollout, and guards
+├── weights/emulator.pt      # calibrated three-member ensemble
+├── training/                # training, calibration, and ensemble scripts
+├── dashboard/               # offline interactive web dashboard and impact module
+├── tests/                   # contract and UI checks
+├── tools/model_adapter.py   # evaluation adapter
+├── TRAINING.md              # detailed training/evaluation runbook
+└── project-demo-compressed.mp4
+```
 
-## Data & originality
-Trained only on the organiser-provided `india_climate_train.nc` (2005–2021). Nothing is downloaded at run time. All code, training and weights were built during the hackathon.
+## Limitations
 
-Code: MIT (see `LICENSE`). Fonts: SIL OFL (`dashboard/fonts/LICENSE.txt`). Map display only (never used by the model): state boundaries Natural Earth (public domain), relief NOAA ETOPO 2022, imagery NASA Blue Marble, town names GeoNames (CC BY 4.0). Data: organiser-provided, not redistributed.
+- The model uses a 1-degree daily grid and six surface variables. It has no SST, upper-air fields, or boundary inflow; edge regions are least reliable.
+- By days 8-10, skill is near climatology and intentionally damped; do not infer fine weather detail at those leads.
+- Rainfall is the most difficult target; heavy-rain cells can be displaced by 1-2 grid cells.
+- Counterfactuals are learned statistical responses, not a conservation-based physics simulator. Magnitude is a hypothesis, especially for extreme or out-of-distribution shocks.
+- Agricultural and wind indicators compare model branches; they are not validated decision advice.
+- State boundaries are Natural Earth public-domain geometry and are indicative only.
+
+## Data, attribution, and license
+
+The model was trained only on the organizer-provided `india_climate_train.nc` dataset for 2005-2021. Nothing is downloaded at runtime. Dashboard geography uses Natural Earth boundaries, GeoNames places (CC BY 4.0), NASA Blue Marble imagery, and NOAA ETOPO 2022 relief; see [`dashboard/README.md`](dashboard/README.md) for full asset information.
+
+Code is released under the [MIT License](LICENSE). Bundled dashboard fonts use the SIL Open Font License.

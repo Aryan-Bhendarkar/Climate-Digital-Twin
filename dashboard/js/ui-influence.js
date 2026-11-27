@@ -105,5 +105,5 @@ export function createInfluence(app) {
     $('infPlace').value = p.id; reset();
   }
 
-  return { setup, draw, reset, watch };
+  return { setup, draw, reset, watch, start: () => { if (!running && !res?.effects.some((x) => x !== undefined)) run(); }, halt: () => { if (running) stop(); } };
 }

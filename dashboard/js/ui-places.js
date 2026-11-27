@@ -24,6 +24,8 @@ export function summary(t) {
   const [a, b] = span(t), when = a === b ? `on day ${a}` : `on days ${a} to ${b}`;
   return `${cap(changeWord(t.kind, t.delta))} ${when}${a === b ? '' : `, most on day ${t.peak}`} (${signed(t.delta)} ${KINDS[t.kind].unit})`;
 }
+/** A place named in the headline is itself a button. */
+const link = (r) => `<button type="button" class="s-pl" data-id="${r.id}" title="Open ${r.name}">${r.name}</button>`;
 export const joinNames = (a) => (a.length === 1 ? a[0] : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
 export const badge = (k) => `<em class="s-trust ${k}" title="${TRUST_TIP[k]}">${TRUST[k]}</em>`;
 const TRUST_TIP = { firm: 'Strongest on days 1 to 3, where the model beats simple references most clearly', rough: 'Strongest on days 4 to 7: skill is smaller', dir: 'Days 8 to 10, an unusually large change, or one beyond what the model has seen: trust the direction, not the size' };
@@ -76,7 +78,7 @@ export function createPlaces(app) {
     const top = group[0], most = group.reduce((a, r) => (Math.abs(r.t.delta) > Math.abs(a.t.delta) ? r : a)), k = trust(most.t.peak, app.beyond() || huge(most.t));
     const lead = app.beyond() ? 'Outside the model’s experience, so read the direction only. ' : '';
     const last = Math.max(...away.flatMap((r) => r.t.days.map((x, d) => (x.level ? d + 1 : 0))));
-    return `${lead}Beyond the change, ${joinNames(group.map((r) => r.name))} ${group.length > 1 ? 'get' : 'gets'} ${changeWord(top.t.kind, top.t.delta)}, up to ${signed(most.t.delta)}\u00a0${KINDS[top.t.kind].unit} on day\u00a0${most.t.peak}.${last < 10 ? ` It fades after day\u00a0${last}.` : ''} ${badge(k)}`;
+    return `${lead}Beyond the change, ${joinNames(group.map(link))} ${group.length > 1 ? 'get' : 'gets'} ${changeWord(top.t.kind, top.t.delta)}, up to ${signed(most.t.delta)}\u00a0${KINDS[top.t.kind].unit} on day\u00a0${most.t.peak}.${last < 10 ? ` It fades after day\u00a0${last}.` : ''} ${badge(k)}`;
   }
 
   function setDay() { document.querySelectorAll('#whoList [data-d]').forEach((el) => el.classList.toggle('now', +el.dataset.d === S.day)); }

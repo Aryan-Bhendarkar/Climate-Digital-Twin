@@ -92,7 +92,9 @@ export class Map3D {
     this.flyTo({ x: (x + h.x) / 2, z: (z + h.z) / 2, dist: h.dist * 1.04, pitch: 0.72, bearing: -0.22 }, 1100);
   }
   setOrbit(speed) { this.orbit = still() ? 0 : speed; }
-  zoomBy(factor, ms = 450) { this.flyTo({ dist: this.goal.dist * factor }, ms); }
+  zoomBy(factor, ms = 350) { this.flyTo({ dist: this.goal.dist * factor }, ms); }
+  /** Between looking straight down and the tilted relief. */
+  toggleTilt() { if (this.goal.pitch > 0.2) this.topView(); else this.flyTo({ pitch: 0.66 }, 900); }
   turnBy(bearing, pitch = 0) { this.flyTo({ bearing: this.goal.bearing + bearing, pitch: this.goal.pitch + pitch }, 500); }
 
   // ---------- geometry ----------
@@ -118,6 +120,8 @@ export class Map3D {
     const [sx, sy] = this.xy(ev); let best = null, bd = this.cam.dist < SHOW_FROM ? 28 : 15; // towns are bigger targets than dots
     for (const c of this.visibleCities()) { const p = this.at(c.lon, c.lat, 0.05); if (!p) continue; const d = Math.hypot(p[0] - sx, p[1] - sy); if (d < bd) { bd = d; best = c; } }
     if (best) return best;
+    const named = this.hits?.find((h) => sx >= h.x && sx <= h.x + h.w && sy >= h.y && sy <= h.y + h.h);
+    if (named) return named.place;
     const q = this.ground(ev); if (!q) return null;
     return stateAt(this.places.states, ...toGeo(q[0], q[2]));
   }
@@ -139,7 +143,7 @@ export class Map3D {
       if (pointers.has(e.pointerId)) pointers.set(e.pointerId, this.xy(e));
       if (pointers.size === 2) { // pinch to zoom, twist to turn, two-finger drag to tilt
         const [a, b] = [...pointers.values()], now = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), r: Math.atan2(b[1] - a[1], b[0] - a[0]), y: (a[1] + b[1]) / 2 };
-        if (pinch) { stop(); this.goal = clampCam({ ...this.goal, dist: (this.goal.dist * pinch.d) / Math.max(now.d, 1), bearing: this.goal.bearing + (now.r - pinch.r), pitch: this.goal.pitch - (now.y - pinch.y) * 0.004 }); }
+        if (pinch) { stop(); this.goal = clampCam({ ...this.goal, dist: this.goal.dist * (pinch.d / Math.max(now.d, 1)) ** 1.35, bearing: this.goal.bearing + (now.r - pinch.r), pitch: this.goal.pitch - (now.y - pinch.y) * 0.004 }); }
         pinch = now; if (down) down.moved = true; return;
       }
       if (!down) { this.pointer = e; return; }
@@ -172,15 +176,17 @@ export class Map3D {
     cv.addEventListener('pointerleave', () => { this.pointer = null; this.hovered = null; this.hooks.hover(null); this.dirty = true; });
     cv.addEventListener('wheel', (e) => {
       e.preventDefault(); stop();
-      const dist = clampCam({ ...this.goal, dist: this.goal.dist * Math.exp(Math.max(-120, Math.min(120, e.deltaY)) * 0.0016) }).dist, k = dist / this.goal.dist, p = this.flat(...this.xy(e));
+      // a mouse notch zooms by about 1.4x; a trackpad pinch arrives as small ctrl+wheel steps
+      const cap = e.ctrlKey ? 24 : 120, dy = Math.max(-cap, Math.min(cap, e.deltaY * (e.deltaMode === 1 ? 33 : 1)));
+      const dist = clampCam({ ...this.goal, dist: this.goal.dist * Math.exp(dy * (e.ctrlKey ? 0.012 : 0.003)) }).dist, k = dist / this.goal.dist, p = this.flat(...this.xy(e));
       this.goal = clampCam({ ...this.goal, dist, ...(p ? { x: p[0] + (this.goal.x - p[0]) * k, z: p[1] + (this.goal.z - p[1]) * k } : {}) });
     }, { passive: false });
-    cv.addEventListener('dblclick', (e) => { const p = this.flat(...this.xy(e)); if (p) this.flyTo({ x: p[0], z: p[1], dist: this.goal.dist * 0.55 }, 800); });
+    cv.addEventListener('dblclick', (e) => { const p = this.flat(...this.xy(e)); if (p) this.flyTo({ x: p[0], z: p[1], dist: this.goal.dist * 0.45 }, 700); });
     cv.addEventListener('keydown', (e) => {
       cv.classList.remove('by-pointer'); // show the focus ring again for keyboard users
       const pan = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
       if (pan) { const s = this.goal.dist * 0.1, b = this.goal.bearing; this.flyTo({ x: this.goal.x + s * (pan[0] * Math.cos(b) + pan[1] * Math.sin(b)), z: this.goal.z + s * (pan[1] * Math.cos(b) - pan[0] * Math.sin(b)) }, 300); }
-      else if (e.key === '+' || e.key === '=') this.zoomBy(0.75); else if (e.key === '-') this.zoomBy(1.33);
+      else if (e.key === '+' || e.key === '=') this.zoomBy(0.65); else if (e.key === '-') this.zoomBy(1.55);
       else if (e.key === 'q') this.turnBy(0.3); else if (e.key === 'e') this.turnBy(-0.3); else if (e.key === '0') this.home(); else return;
       e.preventDefault(); e.stopPropagation();
     });
@@ -229,6 +235,7 @@ export class Map3D {
     if (!still()) { this.time += dt; this.lift = Math.min(1, this.lift + dt * 6); } else this.lift = 1;
     if (this.texDirty) { this.paintData(); this.terrain.setData(this.tex); if (this.state.field2) { this.paintData(this.state.field2); this.terrain.setData(this.tex, 3); } this.texDirty = false; }
     this.view3 = camera(this.cam, this.view());
+    const flatView = this.cam.pitch < 0.2; if (flatView !== this.flatView) { this.flatView = flatView; this.hooks.tilt?.(flatView); }
     const split = this.state.field2 && this.state.split !== null ? this.state.split * this.glCanvas.width : null; // compare: Prime left, Multiverse right
     const rise = 1 - Math.pow(1 - this.rise, 4);
     this.terrain.draw(this.view3, { time: this.time, pulse: this.quiet, fog: this.fog, dist: this.cam.dist, split, rise });
@@ -357,14 +364,15 @@ export class Map3D {
   }
 
   names(g) {
-    const taken = [...this.reserved], dist = this.cam.dist;
+    const taken = [...this.reserved], dist = this.cam.dist; this.hits = [];
     const free = (x, y, w, h) => !taken.some((r) => x < r[0] + r[2] && x + w > r[0] && y < r[1] + r[3] && y + h > r[1]);
-    const put = (text, p, { size, weight = 600, color, halo, italic, dot, force }) => {
+    const put = (text, p, { size, weight = 600, color, halo, italic, dot, force }, place) => {
       if (!p || p[0] < -40 || p[0] > this.w + 40 || p[1] < -20 || p[1] > this.h + 20) return;
       g.font = `${italic ? 'italic ' : ''}${weight >= 700 ? 500 : weight} ${weight >= 700 ? size + 1 : size}px ${weight >= 700 ? this.headFont : "'IBM Plex Sans', system-ui"}`;
       const w = g.measureText(text).width, x = dot ? p[0] + 8 : p[0] - w / 2, y = p[1];
       if (!force && !free(x - 3, y - size * 0.7, w + 6, size * 1.4)) return;
       taken.push([x - 3, y - size * 0.7, w + 6, size * 1.4]);
+      if (place) { const left = dot ? p[0] - 7 : x - 4; this.hits.push({ x: left, y: y - size * 0.8, w: x + w + 4 - left, h: size * 1.6, place }); } // every name is clickable
       if (dot) { g.beginPath(); g.arc(p[0], p[1], dot, 0, 7); g.fillStyle = '#f6f1e2'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#10140f'; g.stroke(); }
       g.textAlign = 'left'; g.textBaseline = 'middle'; g.lineWidth = 3.6; g.strokeStyle = halo; g.strokeText(text, x, y); g.fillStyle = color; g.fillText(text, x, y);
     };
@@ -373,12 +381,12 @@ export class Map3D {
     const cities = this.visibleCities().filter((c) => !labelled.has(c.id)).sort((a, b) => a.tier - b.tier || b.pop - a.pop);
     const hushed = labelled.size && this.cam.dist > 20;
     const clear = (c) => (dist < SHOW_FROM - 3 ? this.models.top(c.tier) : 0.1); // names sit above the little towns
-    for (const c of [this.focused, this.hovered]) if (c) put(c.name, this.at(c.lon, c.lat, c.kind === 'city' ? clear(c) + 0.02 : 0.55), { ...dark, size: 15, weight: 700, dot: c.kind === 'city' ? 4.5 : 0, force: true });
+    for (const c of [this.focused, this.hovered]) if (c) put(c.name, this.at(c.lon, c.lat, c.kind === 'city' ? clear(c) + 0.02 : 0.25), { ...dark, size: 15, weight: 700, dot: c.kind === 'city' ? 4.5 : 0, force: true }, c);
     g.globalAlpha = hushed ? 0.5 : 1; // while places are being pointed out, the other names step back
-    for (const c of cities.filter((x) => x.tier === 1)) if (c !== this.focused && c !== this.hovered) put(c.name, this.at(c.lon, c.lat, clear(c)), { ...tone, size: 13, weight: 650, dot: 3.4 });
+    for (const c of cities.filter((x) => x.tier === 1)) if (c !== this.focused && c !== this.hovered) put(c.name, this.at(c.lon, c.lat, clear(c)), { ...tone, size: 13, weight: 650, dot: 3.4 }, c);
     const states = [...this.places.states].sort((a, b) => b.size - a.size).filter((s) => (dist > 34 ? s.size > 9 : dist > 17 ? s.size > 2.5 : true));
-    for (const s of states) if (s !== this.focused && s !== this.hovered && s.group !== 'ISL' && s.group !== 'UT') put(s.name, this.at(s.lon, s.lat, 0.25), { ...tone, size: dist < 15 ? 17 : 13, weight: 700 });
-    for (const c of cities.filter((x) => x.tier > 1)) if (taken.length < 75 && c !== this.focused && c !== this.hovered) put(c.name, this.at(c.lon, c.lat, clear(c)), { ...tone, size: c.tier === 2 ? 12.5 : c.tier === 3 ? 12 : 11, dot: c.tier === 2 ? 3 : 2.3 });
+    for (const s of states) if (s !== this.focused && s !== this.hovered && s.group !== 'ISL' && s.group !== 'UT') put(s.name, this.at(s.lon, s.lat, 0.25), { ...tone, size: dist < 15 ? 17 : 13, weight: 700 }, s);
+    for (const c of cities.filter((x) => x.tier > 1)) if (taken.length < 75 && c !== this.focused && c !== this.hovered) put(c.name, this.at(c.lon, c.lat, clear(c)), { ...tone, size: c.tier === 2 ? 12.5 : c.tier === 3 ? 12 : 11, dot: c.tier === 2 ? 3 : 2.3 }, c);
     g.globalAlpha = 1;
     for (const s of SEAS) put(s.name, this.at(s.lon, s.lat, 0.05), { color: 'rgba(214,228,232,.82)', halo: 'rgba(4,14,20,.55)', size: dist < 20 ? 18 : 15, italic: true, weight: 700 });
   }
@@ -405,11 +413,24 @@ export class Map3D {
   }
 
   placePins() {
+    const named = [];
     for (const p of this.pinList) {
       const el = this.pins.get(p.id), s = el && this.at(p.lon, p.lat, 0.05);
       if (!el) continue;
       el.style.visibility = s ? '' : 'hidden';
-      if (s) { el.style.left = s[0] + 'px'; el.style.top = s[1] + 'px'; el.style.zIndex = p.selected ? 900 : Math.max(1, 800 - Math.round(s[2] * 5)); }
+      if (!s) continue;
+      el.style.left = s[0] + 'px'; el.style.top = s[1] + 'px'; el.style.zIndex = p.selected ? 900 : Math.max(1, 800 - Math.round(s[2] * 5));
+      if (p.named) named.push({ p, el, s });
+    }
+    // named pins: each label takes the first side (above, below, left, right) that is clear of the ones already placed
+    const taken = [];
+    for (const { p, el, s } of named.sort((a, b) => a.p.slot - b.p.slot)) {
+      const w = el.firstChild.offsetWidth, h = el.firstChild.offsetHeight, x = s[0], y = s[1] - 29;
+      const sides = [[x - w / 2, y - 14 - h], [x - w / 2, y + 36], [x - 16 - w, y - h / 2], [x + 16, y - h / 2]];
+      const clear = ([a, b]) => !taken.some(([c, d, cw, ch]) => a < c + cw + 4 && a + w + 4 > c && b < d + ch + 2 && b + h + 2 > d);
+      const order = [p.slot, 0, 1, 2, 3], side = order.find((k) => clear(sides[k])) ?? p.slot;
+      taken.push([...sides[side], w, h]);
+      for (let k = 0; k < 4; k++) el.classList.toggle(`r${k}`, k === side);
     }
   }
 }

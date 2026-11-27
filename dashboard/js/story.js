@@ -38,17 +38,18 @@ function defaultServer() {
 const S = {
   api: new Api(defaultServer()), assets: null, samples: [], file: null, name: '', init: null, doy: null,
   prime: null, mv: null, msP: null, msM: null, mvInit: null, pert: null, sc: null, box: null, comps: [], rip: null, K: null, W: null, shock: null,
-  v: 0, ik: 'rain', split: 0.4, layer: 'land', focus: '1', smooth: false, land: true, glow: false, motion: true, day: 1, mode: 'normal', tab: 'ask', group: 'everyday', strength: 1, drawn: null, playing: false, timer: null, healthy: false, busy: 0, runId: 0,
+  v: 0, ik: 'rain', split: 0.4, layer: 'land', focus: '1', drawing: false, land: true, glow: false, motion: true, day: 1, mode: 'normal', tab: 'ask', group: 'everyday', strength: 1, drawn: null, playing: false, timer: null, healthy: false, busy: 0, runId: 0,
 };
 window.__story = S;
 const app = { S };
+window.__app = app; // like __story: lets tests/e2e.mjs read the map
 
-/** What the chosen layer and view mean for the map: satellite weather, the stepped change, or one smooth field. */
+/** What the chosen layer and view mean for the map: satellite weather, the stepped change, or a forecast field. */
 function applyView() {
   if (S.layer === 'land' && app.map && !app.map.glCanvas) S.layer = S.focus; // the flat map has no satellite picture
   const v = S.layer === 'land' ? null : +S.layer;
   if (v !== null) S.v = v;
-  const stepped = v !== null && v <= 2 && !!S.mv && S.mode === 'diff' && !S.smooth;
+  const stepped = v !== null && v <= 2 && !!S.mv && S.mode === 'diff';
   if (v === null) { S.land = true; S.glow = false; if (S.mode === 'diff' || S.mode === 'split') S.mode = S.mv ? 'whatif' : 'normal'; }
   else { S.land = stepped && !!app.map?.glCanvas; S.glow = S.land; if (stepped) S.ik = ['temp', 'rain', 'wind'][v]; }
 }
@@ -155,7 +156,8 @@ async function runWhatIf(sc) {
     const moving = !matchMedia('(prefers-reduced-motion: reduce)').matches; S.day = moving ? 1 : Math.max(2, app.stage.peakDay(S.v));
     app.causes.reset(); app.judge.reset(); if (!sameChange) app.explore.close(false); if (sc.group && sc.group !== S.group) showGroup(sc.group); renderAll();
     for (const el of [$('capTitle'), $('hdMain')]) { el.classList.remove('enter'); void el.offsetWidth; el.classList.add('enter'); }
-    if (moving && S.tab === 'ask') play(true); // watch the effect spread from where it was made
+    setDraw(false);
+    if (moving && S.tab === 'ask') play(true, true); // watch the effect spread from where it was made, then rest on its peak
     document.querySelectorAll('.s-card').forEach((b) => { b.classList.toggle('on', b.dataset.id === sc.id); b.setAttribute('aria-pressed', b.dataset.id === sc.id); });
     $('strength').hidden = false; $('strength').classList.toggle('pasted', !!sc.pert); showStrength();
     const notes = [sc.note, clamped && 'Rain and humidity were kept above zero.'].filter(Boolean).join(' ');
@@ -170,7 +172,7 @@ async function runNew(sc, { stay } = {}) {
   S.strength = 1; $('stRange').value = 1;
   const from = S.tab, ok = await runWhatIf(sc);
   if (ok && !stay && S.tab === from) { // someone who moved on to another tab stays there
-    if (from !== 'ask') { setTab('ask'); if (!still()) { S.day = 1; play(true); } }
+    if (from !== 'ask') { setTab('ask'); if (!still()) { S.day = 1; play(true, true); } }
     $('sSteps').scrollTo({ top: 0, behavior: smooth() });
     $('hdMain').focus({ preventScroll: true }); // so Space and the arrow keys drive the timeline straight away
   }
@@ -216,7 +218,7 @@ function showStrength() {
 function showGroup(group) {
   S.group = group;
   document.querySelectorAll('#segGroup button').forEach((b) => { b.classList.toggle('on', b.dataset.group === group); b.setAttribute('aria-pressed', b.dataset.group === group); });
-  $('mix').hidden = group !== 'mix'; $('cards').hidden = group === 'mix'; $('sMapWrap').classList.toggle('draw', group === 'mix');
+  $('mix').hidden = group !== 'mix'; $('cards').hidden = group === 'mix'; if (group !== 'mix') setDraw(false);
   document.querySelectorAll('.s-card').forEach((b) => (b.hidden = b.dataset.group !== group));
   if (group === 'mix') return previewRegion();
   if (!S.mv) S.box = null;
@@ -253,7 +255,7 @@ function runMix() {
   const values = mixValues();
   if (!Object.keys(values).length) return ($('mixError').textContent = 'Move at least one slider.');
   const r = REGIONS.find((x) => x.id === $('cuWhere').value);
-  if (!r.box && !S.drawn) return ($('mixError').textContent = 'Drag a box on the map, or pick a named area.');
+  if (!r.box && !S.drawn) return ($('mixError').textContent = 'Draw an area on the map first, or pick a named area.');
   const box = r.box || [lat(S.drawn.i0), lat(S.drawn.i1), lon(S.drawn.j0), lon(S.drawn.j1)];
   const first = PARTS.find((p) => values[p.id]).id;
   runNew({ id: 'mix', title: 'Custom', area: r.say, box, values, focus: first });
@@ -268,7 +270,8 @@ function setupStep2() {
   $('mixRows').innerHTML = PARTS.map((p) => `<div class="s-mixrow"><label for="mx-${p.id}">${p.label}</label><input type="range" id="mx-${p.id}" min="${p.min}" max="${p.max}" step="${p.step}" value="0"><output id="mo-${p.id}" for="mx-${p.id}"></output></div>`).join('');
   for (const p of PARTS) $('mx-' + p.id).oninput = syncMix;
   $('cuWhere').innerHTML = REGIONS.map((r) => `<option value="${r.id}">${r.name}</option>`).join('');
-  $('cuWhere').onchange = previewRegion;
+  $('cuWhere').onchange = () => { setDraw($('cuWhere').value === 'drawn' && !S.drawn); previewRegion(); };
+  $('cuDraw').onclick = () => setDraw(!S.drawing); $('drawStop').onclick = () => setDraw(false);
   $('cuClear').onclick = () => { for (const p of PARTS) $('mx-' + p.id).value = 0; syncMix(); };
   $('scClear').onclick = () => app.clear();
   $('cuRun').onclick = runMix;
@@ -284,7 +287,7 @@ function setTab(tab) {
   if (tab !== 'ask' && tab !== was) app.explore.close(false);
   document.querySelectorAll('.s-tabs [role=tab]').forEach((b, i) => { const on = b.dataset.tab === tab; b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1; if (on) $('tabInk').style.transform = `translateX(${i * 100}%)`; });
   document.querySelectorAll('.s-pane').forEach((p) => (p.hidden = p.dataset.pane !== tab));
-  $('sMapWrap').classList.toggle('draw', tab === 'ask' && S.group === 'mix');
+  setDraw(false);
   if (!S.mv) { S.box = null; if (tab === 'ask' && S.group === 'mix') { const r = REGIONS.find((x) => x.id === $('cuWhere').value); S.box = r.box ? boxFromLatLon(...r.box) : S.drawn; } }
   if (tab !== 'influence') app.stage.map.set({ tiles: null });
   app.stage.render(); app.explore.render(); if (tab === 'test') app.judge.drawSpread();
@@ -350,15 +353,42 @@ async function showExpert(tab) {
   window.dispatchEvent(new Event('resize'));
 }
 function showStory() { document.body.dataset.view = 'story'; $('expert').hidden = true; setTimeout(() => app.stage.render(), 30); }
-function play(on) {
+/** Play runs the days once, to day 10. `rest`: come to rest on the day the change is felt most widely. */
+function play(on, rest) {
   const word = on ? 'Pause' : 'Play';
-  S.playing = on; $('sPlay').setAttribute('aria-label', word); $('sPlay').title = `${word} (Space)`; clearInterval(S.timer); // the icon is drawn from the label (css)
+  S.playing = on; $('sPlay').setAttribute('aria-label', word); $('sPlay').dataset.tip = word; clearInterval(S.timer); // the icon is drawn from the label (css)
   app.stage.impactRun(false);
   if (!on) return;
   if (app.stage.isSpreading()) app.stage.render();
-  if (app.stage.isImpact()) return app.stage.impactRun(true);
-  S.timer = setInterval(() => setDay(S.day >= 10 ? 1 : S.day + 1, true), 800);
+  if (app.stage.isImpact()) return app.stage.impactRun(true, rest);
+  if (S.day >= 10) setDay(1, true);
+  S.timer = setInterval(() => (S.day >= 10 ? play(false) : setDay(S.day + 1, true)), 900);
 }
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** The calendar date of forecast day d, counted on from the start day ('' for a pasted request). */
+function dateOf(d) {
+  const [day, month, year] = (S.samples.find((x) => x.file === S.file)?.date_label || '').split(' ');
+  if (!year) return '';
+  const t = new Date(Date.UTC(+year, MONTHS.indexOf(month), +day + d));
+  return `${t.getUTCDate()} ${MONTHS[t.getUTCMonth()]}`;
+}
+
+// ---------- drawing an area ----------
+/** On: the next drag on the map picks an area. It switches itself off after one drag, on Esc, or on a click elsewhere. */
+function setDraw(on) {
+  if (on) {
+    if (S.tab !== 'ask') setTab('ask');
+    app.explore.close(false);
+    if (S.group !== 'mix') S.sc?.values ? openMix(S.sc) : showGroup('mix');
+    if (matchMedia('(max-width: 980px)').matches) $('sMapWrap').scrollIntoView({ block: 'start', behavior: smooth() });
+  }
+  if (S.drawing === on) return;
+  S.drawing = on; $('sMapWrap').classList.toggle('draw', on); $('drawHint').hidden = !on; $('story').classList.toggle('drawing', on);
+  for (const id of ['cuDraw', 'mcDraw']) $(id).setAttribute('aria-pressed', on);
+  $('cuDraw').lastElementChild.textContent = on ? 'Stop drawing' : S.drawn ? 'Draw the area again' : 'Draw the area on the map';
+  $('sMap').style.cursor = ''; app.stage.map.set({ dragBox: !on && S.mv && app.mixing() ? S.preview : null });
+}
+const openTech = (section) => { play(false); setDraw(false); app.tour.end(); import('./tech.js').then((m) => m.openTech(section)); };
 function setDay(d, playing) { if (!playing && S.playing) play(false); S.day = Math.max(1, Math.min(10, d)); app.stage.render(); app.places.setDay(); app.explore.render(); if (S.tab === 'test') app.judge.drawSpread(); }
 
 // ---------- the map ----------
@@ -375,9 +405,14 @@ function insets() {
     bottom: deck.height ? Math.max(0, box.bottom - deck.top - solid + 14) : 0,
   };
 }
+/** The 2D / 3D button names the view it switches to. */
+function showTilt(flatView) {
+  const word = flatView ? '3D view' : 'Flat view';
+  $('mcTop').firstElementChild.textContent = flatView ? '3D' : '2D'; $('mcTop').dataset.tip = word; $('mcTop').setAttribute('aria-label', word);
+}
 const picture = (src) => new Promise((done) => { const img = new Image(); img.onload = () => done(img); img.onerror = () => done(null); img.src = src; });
 function createMap(outlines, terrain) {
-  const hooks = { insets, canDraw: () => app.canDraw(), hover: (p, e) => app.explore?.hover(p, e), pick: (p) => app.explore.pick(p) };
+  const hooks = { insets, canDraw: () => app.canDraw(), hover: (p, e) => app.explore?.hover(p, e), pick: (p) => app.explore.pick(p), tilt: showTilt };
   try {
     if (new URLSearchParams(location.search).has('flat')) throw new Error('?flat=1 was requested'); // for weak graphics hardware
     if (!terrain.elevation || !terrain.imagery) throw new Error('the map pictures did not load');
@@ -391,11 +426,13 @@ function createMap(outlines, terrain) {
 }
 function syncPanelButton() {
   const hidden = document.body.classList.contains('panel-hidden');
-  $('mcPanel').setAttribute('aria-pressed', hidden); $('mcPanel').title = hidden ? 'Show the panel' : 'Hide the panel';
+  const word = hidden ? 'Show panel' : 'Hide panel';
+  $('mcPanel').setAttribute('aria-pressed', hidden); $('mcPanel').dataset.tip = word; $('mcPanel').setAttribute('aria-label', word);
 }
 function bindMapControls() {
-  $('mcIn').onclick = () => app.map.zoomBy(0.68); $('mcOut').onclick = () => app.map.zoomBy(1.47);
-  $('mcTop').onclick = () => app.map.topView();
+  $('mcIn').onclick = () => app.map.zoomBy(0.58); $('mcOut').onclick = () => app.map.zoomBy(1.72);
+  $('mcTop').onclick = () => app.map.toggleTilt();
+  $('mcDraw').onclick = () => setDraw(!S.drawing);
   $('mcHome').onclick = () => { app.explore.close(false); app.map.home(); };
   $('mcMotion').onclick = () => { S.motion = !S.motion; $('mcMotion').setAttribute('aria-pressed', S.motion); app.stage.render(); };
   $('mcPanel').onclick = () => { document.body.classList.toggle('panel-hidden'); syncPanelButton(); };
@@ -409,13 +446,14 @@ async function init() {
   S.assets = { grid, heat, rainClim }; S.samples = idx;
   app.geo = mapPlaces(outlines, gazetteer);
   Object.assign(app, {
-    play, banner, runNew, openMix, setTab, setDay,
+    play, banner, runNew, openMix, setTab, setDay, setDraw, showGroup, dateOf, openTech,
     view: applyView,
     clear: () => { S.runId++; S.wanted = null; clearWhatIf(); renderAll(); writeLink(); }, // runId: a run still in flight must not come back
     beyond: () => !!(S.sc && !S.sc.pert && outOfRange(S.sc.values, S.sc.strength).length),
     useInput: (init, doy) => { showPastedStart(); useInput(init, doy); },
-    canDraw: () => S.tab === 'ask' && S.group === 'mix',
-    drew: (box) => { S.drawn = box; $('cuWhere').value = 'drawn'; previewRegion(); },
+    canDraw: () => S.drawing,
+    mixing: () => S.tab === 'ask' && S.group === 'mix',
+    drew: (box) => { S.drawn = box; $('cuWhere').value = 'drawn'; $('mixError').textContent = ''; setDraw(false); previewRegion(); },
   });
   const began = performance.now(); app.map = createMap(outlines, terrain); console.info(`map built in ${Math.round(performance.now() - began)} ms`); S.land = !!app.map.glCanvas; // the landscape view needs the 3D map
   app.stage = createStage(app, app.map); app.explore = createExplorer(app, app.geo); app.places = createPlaces(app); app.causes = createCauses(app); app.influence = createInfluence(app); app.judge = createJudge(app); app.tour = createTour(app); app.fork = createFork(app);
@@ -429,7 +467,6 @@ async function init() {
     if (i === 'land') S.beforeLand = S.mode; else if (S.layer === 'land' && S.mv && S.beforeLand) S.mode = S.beforeLand; // the satellite layer has no difference view: come back to where you were
     S.layer = i; applyView(); app.stage.render();
   }));
-  $('sSmooth').onchange = () => { play(false); S.smooth = $('sSmooth').checked; applyView(); app.stage.render(); };
   bindMapControls(); slidingThumbs($('story'));
   app.map.setTheme?.(getComputedStyle($('story')));
   setupStep2();
@@ -445,14 +482,24 @@ async function init() {
     b.onkeydown = (e) => { const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!step) return; e.preventDefault(); e.stopPropagation(); const n = tabs[(i + step + tabs.length) % tabs.length]; n.focus(); setTab(n.dataset.tab); };
   });
   $('selDate').onchange = (e) => { if (e.target.value) loadSample(e.target.value); };
-  $('sPlay').onclick = () => play(!S.playing); $('sDay').oninput = (e) => { play(false); setDay(+e.target.value); };
+  $('sPlay').onclick = () => { if (S.playing) { play(false); setDay(S.day); } else play(true); }; // pausing settles on a whole day
+  $('sPrev').onclick = () => setDay(S.day - 1); $('sNext').onclick = () => setDay(S.day + 1);
+  $('sDay').oninput = (e) => { play(false); setDay(+e.target.value); };
   $('sSpread').onclick = () => app.stage.spread();
   document.querySelectorAll('[data-expert]').forEach((b) => (b.onclick = () => showExpert(b.dataset.expert)));
   $('btnExpert').onclick = () => showExpert(); $('btnTour').onclick = () => app.tour.start(); $('btnStory').onclick = showStory;
+  $('btnTech').onclick = () => openTech();
+  document.querySelectorAll('[data-tech]').forEach((b) => (b.onclick = () => openTech(b.dataset.tech)));
+  $('hdMain').onclick = (e) => { const b = e.target.closest('[data-id]'); if (b) app.places.select(b.dataset.id); };
+  // leaving the map ends drawing, so the crosshair never follows the user around
+  document.addEventListener('pointerdown', (e) => { if (S.drawing && !e.target.closest?.('#sMap, #cuDraw, #mcDraw')) setDraw(false); }, true);
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.drawing) { e.preventDefault(); e.stopImmediatePropagation(); setDraw(false); } }, true);
   $('sRetry').onclick = () => { S.api.base = $('sServer').value.trim(); try { localStorage.setItem('mm_server', S.api.url); } catch (e) { /* ignore */ } checkHealth().then(() => S.init && S.healthy && !S.busy && forecast()); };
   window.addEventListener('keydown', (e) => {
+    if (!$('tech').hidden || e.target.closest?.('#sTour')) return; // those two use the keys themselves
     if (document.body.dataset.view === 'story' && e.key === '/' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); return $('sFind').focus(); }
-    if (document.body.dataset.view !== 'story' || S.tab === 'influence' || /INPUT|SELECT|TEXTAREA|BUTTON|SUMMARY/.test(document.activeElement.tagName)) return;
+    const onPlayer = !!document.activeElement.closest?.('.s-player, .s-days'), arrows = e.key === 'ArrowRight' || e.key === 'ArrowLeft';
+    if (document.body.dataset.view !== 'story' || S.tab === 'influence' || (/INPUT|SELECT|TEXTAREA|BUTTON|SUMMARY/.test(document.activeElement.tagName) && !(onPlayer && arrows))) return;
     if (e.key === ' ') { e.preventDefault(); play(!S.playing); } else if (e.key === 'ArrowRight') setDay(S.day + 1); else if (e.key === 'ArrowLeft') setDay(S.day - 1);
   });
   window.addEventListener('resize', () => app.map.draw());

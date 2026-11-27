@@ -73,11 +73,11 @@ export function createStage(app, map) {
   }
 
   function controls(mode) {
-    $('sDay').value = S.day; $('dayNow').textContent = S.day;
+    $('sDay').value = S.day; $('dayNow').textContent = S.day; $('dayDate').textContent = app.dateOf(S.day);
+    $('sPrev').setAttribute('aria-disabled', S.day <= 1); $('sNext').setAttribute('aria-disabled', S.day >= 10); // not `disabled`: the focus stays put at the ends
     $('segMode').hidden = !S.mv; document.querySelectorAll('#segMode button').forEach((b) => { const on = b.dataset.mode === mode; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     document.querySelectorAll('#chipVar .s-chip').forEach((b) => { const on = b.dataset.i === S.layer; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-    $('smoothWrap').hidden = !(S.mv && mode === 'diff' && S.layer !== 'land' && +S.layer <= 2 && !flat);
-    $('sSpread').hidden = !S.mv || !S.box; $('sSpread').textContent = spreading ? 'Stop' : 'Trace spread';
+    $('sSpread').hidden = !S.mv || !S.box; $('sSpread').textContent = spreading ? 'Stop' : 'Watch it spread';
     app.fork?.render();
   }
   function legend(cmap, ends, title = '') {
@@ -95,7 +95,7 @@ export function createStage(app, map) {
     if ($('capTitle').textContent !== whole) $('capTitle').textContent = whole;
     $('capSub').textContent = line;
   }
-  const common = () => ({ labels: LABELS, outline: OUTLINE, box: S.box, boxText: S.box ? (S.mv ? 'Changed area' : 'Selected area') : null, empty: null, rings: null, tiles: null, dragBox: S.mv && app.canDraw() ? S.preview || null : null, layer: null, contours: null, marks: null, field2: null, split: null, pulse: false });
+  const common = () => ({ labels: LABELS, outline: OUTLINE, box: S.box, boxText: S.box ? (S.mv ? 'Changed area' : 'Selected area') : null, empty: null, rings: null, tiles: null, dragBox: S.mv && app.mixing() ? S.preview || null : null, layer: null, contours: null, marks: null, field2: null, split: null, pulse: false });
   const diffEnds = (v, A) => [`${sgn(-A, A < 10 ? 1 : 0)} ${v.unit} (${v.dends[0]})`, 'no change', `${sgn(A, A < 10 ? 1 : 0)} ${v.unit} (${v.dends[1]})`];
 
   // ---------- impact view: the change glowing over the land, from where you made it outward ----------
@@ -147,15 +147,15 @@ export function createStage(app, map) {
     const step = (now) => { const k = Math.max(0, Math.min(1, (now - t0) / 420)); paintImpact(from + (to - from) * ease(k)); if (k < 1) tween = requestAnimationFrame(step); };
     tween = requestAnimationFrame(step);
   }
-  /** Play the impact from day 0 (your change) to day 10 once, then rest on the day it is felt most widely. */
-  function impactRun(on) {
+  /** Play the impact from day 0 (your change) to day 10 once. `rest`: then settle on the day it is felt most widely. */
+  function impactRun(on, rest) {
     cancelAnimationFrame(impactLoop); impactLoop = 0;
     if (!on) return;
     cancelAnimationFrame(tween);
     const PER_DAY = 1100, n = 10; let t = S.day > 1 && shownT && shownT < n - 0.05 ? shownT : 0, last = performance.now(), day = 0;
     const step = (now) => {
       const dt = Math.max(0, Math.min(100, now - last)); last = now;
-      if (t >= n) { impactLoop = 0; app.play(false); return app.setDay(peakDay()); }
+      if (t >= n) { impactLoop = 0; app.play(false); return app.setDay(rest ? peakDay() : n); }
       t = Math.min(n, t + dt / PER_DAY);
       const d = Math.max(1, Math.ceil(t - 0.001));
       paintImpact(t);
@@ -219,7 +219,7 @@ export function createStage(app, map) {
   function spread() {
     if (spreading) return stopSpread();
     if (!S.mv || !S.box) return;
-    app.play(false); cancelAnimationFrame(tween); setPins([]); $('sSplit').hidden = true; if (+S.layer > 2 || S.layer === 'land') S.layer = S.focus; S.mode = 'diff'; S.smooth = false; app.view(); S.land = S.glow = true; map.setEffects(null); app.explore.close(false);
+    app.play(false); cancelAnimationFrame(tween); setPins([]); $('sSplit').hidden = true; if (+S.layer > 2 || S.layer === 'land') S.layer = S.focus; S.mode = 'diff'; app.view(); S.land = S.glow = true; map.setEffects(null); app.explore.close(false);
     map.setWeather(null, {}); map.frameBox(S.box); map.setOrbit(0.045);
     const box = { ...S.box }, n = stepsOf(S.prime);
     const clean = Array.from({ length: n }, (_, d) => maxOutside(S.prime, S.mv, box, d + 1)).every((m) => !m);
@@ -232,7 +232,7 @@ export function createStage(app, map) {
       let t = Math.min(n, ms < 3 * SLOW ? ms / SLOW : 3 + (ms - 3 * SLOW) / FAST); if (still()) t = Math.floor(t);
       const lim = dilate(box, REACH * t), covered = coversGrid(lim);
       S.day = Math.max(1, Math.ceil(t));
-      if (t > 0 && S.day !== lit) { lit = S.day; map.setEffects(hitToday()); } // places light up as the change arrives
+      if (t > 0 && S.day !== lit) { lit = S.day; map.setEffects(hitToday()); controls('diff'); } // places light up as the change arrives
       const rings = [];
       for (let k = 1; k <= Math.floor(t); k++) { const r = dilate(box, REACH * k); if (!coversGrid(r)) rings.push({ box: r, alpha: 0.28 }); }
       if (!covered && t > 0) rings.push({ box: lim, text: `Reach limit, day ${t.toFixed(1)}` });
@@ -260,7 +260,13 @@ export function createStage(app, map) {
       tip.innerHTML = h; tip.hidden = false; tip.style.left = Math.min(e.clientX + 14, innerWidth - 200) + 'px'; tip.style.top = Math.min(e.clientY + 14, innerHeight - 110) + 'px';
     });
     cv.addEventListener('mouseleave', () => { if (flat) tip.hidden = true; });
-    cv.addEventListener('pointerdown', (e) => { if (!app.canDraw()) return; const cell = map.cellAt(e); if (cell) { down = { cell, x: e.clientX, y: e.clientY, moved: false }; e.preventDefault(); } });
+    cv.addEventListener('pointerdown', (e) => {
+      if (!app.canDraw() || e.button !== 0 || e.shiftKey || e.ctrlKey) return; // right or shift drag still turns the map
+      const cell = map.cellAt(e); if (!cell) return app.setDraw(false); // a click off the grid ends drawing
+      down = { cell, x: e.clientX, y: e.clientY, moved: false }; e.preventDefault();
+    });
+    // the flat map has no camera to pick places for it: a click opens the city in that grid square
+    cv.addEventListener('click', (e) => { if (!flat || app.canDraw() || S.tab === 'influence') return; const cell = map.cellAt(e), city = cell && app.geo.main.find((c) => c.cells[0][0] === cell.i * NLON + cell.j); if (city) app.explore.pick(city); });
     window.addEventListener('pointerup', (e) => {
       if (!down) return; const dn = down; down = null; map.set({ dragBox: null });
       const c2 = map.cellAt(e) || dn.cell;

@@ -1,0 +1,113 @@
+/* "How it works": the technical screen. Same palette and type as the guided view; its own element so it can open over
+   either that view or the Expert view. */
+#tech{--ground:#0a0e0b;--surface:#121711;--raised:#1b2219;--rule:#272f25;--control:#66735f;--ink:#f2ecda;--mut:#a2a997;--wet:#8ab0ea;--warm:#f2a35e;
+  position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;background:var(--ground);color:var(--ink);font:400 15px/1.6 'IBM Plex Sans','Segoe UI',system-ui,sans-serif;font-variant-numeric:tabular-nums;color-scheme:dark;-webkit-font-smoothing:antialiased}
+#tech[hidden]{display:none}
+#tech *{box-sizing:border-box}
+#tech [hidden]{display:none!important}
+#tech h2,#tech h3,#tech h4{margin:0;font-family:Newsreader,Georgia,serif;font-weight:300;line-height:1.2;color:var(--ink)}
+#tech button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+#tech button:disabled{opacity:.4;cursor:default}
+#tech :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+#tech p{margin:12px 0;max-width:72ch}
+
+.tk-head{display:flex;align-items:center;gap:12px;flex:none;padding:12px 24px;border-bottom:1px solid var(--rule)}
+#tech .tk-head h2{margin-right:auto;font-size:25px}
+#tech .tk-btn{min-height:36px;padding:0 16px;border:1px solid var(--control);border-radius:2px;font-weight:600;font-size:13px;white-space:nowrap;transition:background .15s,border-color .15s}
+#tech .tk-btn:hover:not(:disabled){border-color:var(--ink);background:var(--raised)}
+#tech .tk-btn.primary{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+#tech .tk-btn.primary:hover:not(:disabled){background:#fff}
+
+.tk-body{flex:1;min-height:0;display:grid;grid-template-columns:230px minmax(0,1fr)}
+.tk-nav{display:flex;flex-direction:column;gap:2px;padding:20px 12px;border-right:1px solid var(--rule);overflow:auto}
+#tech .tk-nav button{padding:8px 12px;border-radius:2px;text-align:left;color:var(--mut);font-weight:500;font-size:13.5px;white-space:nowrap}
+#tech .tk-nav button:hover{color:var(--ink);background:var(--raised)}
+#tech .tk-nav button[aria-current]{color:var(--ground);background:var(--ink)}
+.tk-main{overflow:auto;padding:0 clamp(16px,5vw,72px);scrollbar-width:thin;scrollbar-color:var(--rule) transparent}
+#tech .tk-main:focus{outline:0}
+.tk-main section{max-width:980px;padding:36px 0 40px;border-bottom:1px solid var(--rule)}
+.tk-main section:last-child{border-bottom:0;padding-bottom:30vh}
+#tech .tk-title{font-size:clamp(28px,3vw,40px)}
+#tech .tk-main section>h3:not(.tk-title){margin:30px 0 4px;font-size:22px}
+#tech .lead{font:300 20px/1.5 Newsreader,Georgia,serif}
+.tk-main ul{max-width:72ch;padding-left:20px}.tk-main li{margin:4px 0}
+
+.tk-scroll{overflow-x:auto;margin:16px 0}
+#tech table{width:100%;border-collapse:collapse;font-size:13.5px;line-height:1.45}
+#tech table.wide{min-width:560px}
+#tech th,#tech td{padding:10px 14px 10px 0;border:0;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top;background:none;color:var(--ink)}
+#tech thead th{color:var(--mut);font-weight:500;font-size:12.5px}
+#tech tbody th{font-weight:600}
+#tech td{color:#cfd2c2}
+
+/* a pipeline: each step feeds the next, so it is numbered */
+.tk-flow{list-style:none;margin:16px 0;padding:0!important;counter-reset:step;max-width:none}
+.tk-flow li{counter-increment:step;display:grid;grid-template-columns:30px 170px minmax(0,1fr);gap:0 14px;align-items:baseline;margin:0!important;padding:11px 0;border-bottom:1px solid var(--rule)}
+.tk-flow li::before{content:counter(step);color:var(--mut);font:300 22px/1 Newsreader,Georgia,serif}
+.tk-flow span{color:#cfd2c2;font-size:14px}
+
+.tk-loop{display:grid;grid-template-columns:1fr 36px 1.2fr 36px 1.2fr;align-items:center;gap:0 8px;margin:20px 0;padding:20px;background:var(--surface);border:1px solid var(--rule)}
+.tk-loop .col{display:grid;gap:8px}
+.tk-loop span{padding:10px 12px;border:1px solid var(--control);border-radius:2px;text-align:center;font-size:13.5px}
+.tk-loop .net{border-color:var(--wet)}
+.tk-loop .out{background:var(--ink);border-color:var(--ink);color:var(--ground);font-weight:600}
+.tk-loop i{height:1px;background:var(--mut);position:relative}
+.tk-loop i::after{content:"";position:absolute;right:0;top:-4px;border-left:7px solid var(--mut);border-block:4.5px solid transparent}
+#tech .tk-loop p{grid-column:1/-1;margin:16px 0 0;padding-top:12px;border-top:1px dashed var(--control);color:var(--mut);font-size:13px;text-align:center;max-width:none}
+
+.tk-reach{margin:18px 0;max-width:620px}
+.tk-seg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+#tech .tk-seg button{padding:6px 14px;border:1px solid var(--control);border-radius:2px;font-size:13px;font-weight:500}
+#tech .tk-seg button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+#tkGrid{display:block;width:100%;height:auto}
+#tkGrid rect{fill:var(--raised);transition:fill .35s}
+#tkGrid .box{fill:var(--warm)}
+#tkGrid .hit{fill:#6a4a30}#tkGrid .hit.d2{fill:#4f3f31}#tkGrid .hit.d3{fill:#3d382c}
+
+#tech .tk-formula{padding:14px 16px;background:var(--surface);border-left:2px solid var(--warm);font:400 18px/1.45 Newsreader,Georgia,serif}
+#tech pre{overflow-x:auto;padding:14px 16px;background:var(--surface);border:1px solid var(--rule);font:12.5px/1.6 ui-monospace,Consolas,monospace;color:#cfd2c2}
+
+.tk-bars{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin:24px 0}
+.tk-bars>div>p{margin:0 0 8px;font-weight:600}
+.tk-bars .bar{display:flex;align-items:center;gap:10px;margin-top:6px}
+.tk-bars .bar i{height:14px;max-width:calc(100% - 56px);background:var(--wet)}
+.tk-bars .bar.b i{background:var(--control)}.tk-bars .bar.neg i{background:var(--warm)}
+.tk-bars .bar b{font-size:13px;font-weight:600}
+.tk-bars figcaption{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px 20px;color:var(--mut);font-size:12.5px;padding:0}
+.tk-bars figcaption span::before{content:"";display:inline-block;width:14px;height:10px;margin-right:7px;background:var(--wet)}
+.tk-bars figcaption .b::before{background:var(--control)}
+#tech figure{margin-inline:0;background:none;border:0;padding:0}
+
+.tk-metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));column-gap:32px}
+.tk-metric{padding:20px 0;border-top:1px solid var(--rule)}
+#tech .tk-metric .v{margin:0;font:200 44px/1.05 Newsreader,Georgia,serif;white-space:nowrap}
+#tech .tk-metric h4{margin:6px 0 0;font-size:18px;font-weight:400}
+#tech .tk-metric p{font-size:13.5px;margin:8px 0 0}
+#tech .tk-metric .how{color:var(--mut);font-size:12.5px}
+
+.tk-live{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:0 0 16px}
+.tk-live div{padding:14px 16px;background:var(--surface);border:1px solid var(--rule)}
+.tk-live dt{color:var(--mut);font-size:12.5px}.tk-live dd{margin:4px 0 0;font:300 22px/1.2 Newsreader,Georgia,serif;overflow-wrap:anywhere}
+
+.tk-limits{list-style:none;padding:0!important}.tk-limits li{padding:12px 0;border-bottom:1px solid var(--rule)}
+
+/* walkthrough: one section on screen, the sentence to say below it */
+#tech.walking .tk-main section{display:none}
+#tech.walking .tk-main section.on{display:block;border:0;padding-bottom:40px;animation:tkin .4s cubic-bezier(.16,1,.3,1)}
+@keyframes tkin{from{opacity:0;translate:0 12px}}
+.tk-walk{display:flex;align-items:center;gap:12px;flex:none;padding:14px 24px;background:var(--raised);border-top:1px solid var(--control)}
+#tech .tk-walk p{display:flex;align-items:baseline;gap:16px;margin:0 auto 0 0;max-width:none}
+.tk-walk span{color:var(--mut);font-size:12.5px;white-space:nowrap}
+.tk-walk b{font:300 19px/1.4 Newsreader,Georgia,serif}
+
+@media (max-width:820px){
+  .tk-head{flex-wrap:wrap;padding:10px 14px}#tech .tk-head h2{width:100%;font-size:21px}
+  .tk-body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .tk-nav{flex-direction:row;padding:8px 12px;border-right:0;border-bottom:1px solid var(--rule)}
+  .tk-main{padding:0 16px}
+  .tk-flow li{grid-template-columns:26px minmax(0,1fr)}.tk-flow span{grid-column:2}
+  .tk-loop{grid-template-columns:1fr;gap:10px}.tk-loop i{display:none}
+  .tk-bars{grid-template-columns:1fr}
+  .tk-walk{flex-wrap:wrap;padding:10px 14px}#tech .tk-walk p{width:100%;flex-direction:column;gap:2px}.tk-walk b{font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){#tech *{animation:none!important;transition:none!important}}

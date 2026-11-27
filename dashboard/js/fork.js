@@ -19,7 +19,10 @@ export function forkSeries(rows) {
 }
 
 export function createFork(app) {
-  const S = app.S, svg = document.getElementById('sFork'), range = document.getElementById('sDay');
+  const S = app.S, svg = document.getElementById('sFork'), range = document.getElementById('sDay'), days = document.getElementById('sDays');
+  // every day is a button under the line, so day 3 or day 5 is one click from day 4
+  days.innerHTML = Array.from({ length: DAYS }, (_, i) => `<button type="button" data-day="${i + 1}">${i + 1}</button>`).join('');
+  days.onclick = (e) => { const b = e.target.closest('[data-day]'); if (b) app.setDay(+b.dataset.day); };
   let key = '', pts = [], base = 0, labels = [];
   const H = 104;
   let PAD = 46, END = 92;
@@ -44,7 +47,8 @@ export function createFork(app) {
     const tone = (d) => `var(--fx-${m.mode === 'place' ? effectKey(m.kind, m.diff[d - 1]) : m.series[d - 1].tone || 'none'})`;
     const curve = (a, b) => `C${(a[0] + b[0]) / 2} ${a[1]} ${(a[0] + b[0]) / 2} ${b[1]} ${b[0]} ${b[1]}`;
     let out = `<path class="past" d="M${x(0) - 34} ${base}H${x(0)}"/><path class="prime" d="M${x(0)} ${base}H${x(DAYS)}"/>`;
-    for (let d = 0; d <= DAYS; d++) out += `<text class="tick" x="${x(d)}" y="${H - 5}">${d === 0 && w >= 520 ? 'Change' : d}</text>`;
+    out += `<text class="tick" x="${x(0)}" y="${H - 5}">${w >= 520 ? 'Change' : 0}</text>`;
+    [...days.children].forEach((b, i) => (b.style.left = `${x(i + 1)}px`));
     if (m.mode === 'empty') {
       out += `<path class="stub" d="M${x(0)} ${base}${curve([x(0), base], [x(2.2), base - 40])}"/><text class="hint" x="${x(2.5)}" y="${base - 36}">Choose a change to fork the timeline</text>`;
       labels = [];
@@ -70,6 +74,10 @@ export function createFork(app) {
       + (p ? `<circle class="on-mv" cx="${p[0]}" cy="${p[1]}" r="6.5"/>` : '')
       + (label ? `<text class="read" x="${x > w / 2 ? x - 10 : x + 10}" y="13" text-anchor="${x > w / 2 ? 'end' : 'start'}">${label}</text>` : '');
     range.setAttribute('aria-valuetext', `Day ${d}${label ? `, ${label}, ${TRUST[k].toLowerCase()}` : ''}`);
+    [...days.children].forEach((b, i) => {
+      const name = [`Day ${i + 1}`, app.dateOf(i + 1)].filter(Boolean).join(', ');
+      b.title = name; b.setAttribute('aria-label', name); if (i + 1 === d) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+    });
   }
 
   function render() {

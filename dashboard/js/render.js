@@ -52,7 +52,7 @@ export class MapPanel {
     this.placePinBox();
   }
   placePinBox() { if (this.pinBox) Object.assign(this.pinBox.style, { left: this.c.offsetLeft + 'px', top: this.c.offsetTop + 'px', width: this.c.style.width, height: this.c.style.height }); }
-  setWeather() {} setEffects() {} setTheme() {} setFocus() {} flyToPlace() {} frameBox() {} home() {} topView() {} setOrbit() {} zoomBy() {} turnBy() {}
+  setWeather() {} setEffects() {} setTheme() {} setFocus() {} flyToPlace() {} frameBox() {} home() {} topView() {} toggleTilt() {} setOrbit() {} zoomBy() {} turnBy() {}
   size() {
     const par = this.c.parentElement, dpr = window.devicePixelRatio || 1;
     let W = par.clientWidth, H = Math.round((W * (EXT.latMax - EXT.latMin)) / (EXT.lonMax - EXT.lonMin));

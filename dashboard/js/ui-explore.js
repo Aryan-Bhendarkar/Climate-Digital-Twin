@@ -6,6 +6,7 @@ import { timeline, trust, huge, changeWord, KINDS, LEVELS } from './insights.js'
 import { summary, badge } from './ui-places.js';
 import { sgn } from './scenarios.js';
 import { smooth } from './stage.js';
+import { feels } from './felt.js';
 
 const $ = (id) => document.getElementById(id);
 export const MEASURES = [
@@ -40,6 +41,21 @@ export function createExplorer(app, places) {
     }).join('');
   }
   const shown = () => (S.mv && S.mode !== 'normal' ? S.mv : S.prime); // the forecast the map is showing
+  /** The five values at a place on one day, as the feel-in-words rules read them. */
+  const day = (roll, d, cells) => Object.fromEntries(MEASURES.map((m) => [m.id, value(roll, d, cells, m)]));
+  /** A card about a place always reports the changed forecast when there is one, unless the map shows Prime. */
+  function story(p) {
+    const d = S.day - 1, roll = shown(), changed = !!S.mv && roll === S.mv;
+    const [air, sky] = feels(day(roll, d, p.cells), changed ? day(S.prime, d, p.cells) : null);
+    const date = app.dateOf(S.day);
+    const arrow = (path) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
+    return `<div class="s-dayline" role="group" aria-label="Report day">
+        <button type="button" data-step="-1" data-tip="Previous day" aria-label="Previous day" aria-disabled="${S.day <= 1}">${arrow('M15 5l-7 7 7 7')}</button>
+        <p aria-live="polite"><b>Day ${S.day}${date ? `, ${date}` : ''}</b><small>${S.mv ? (changed ? 'with your change' : 'without your change') : 'as forecast'}</small></p>
+        <button type="button" data-step="1" data-tip="Next day" aria-label="Next day" aria-disabled="${S.day >= 10}">${arrow('M9 5l7 7-7 7')}</button></div>
+      <div class="s-feels"><p>${air}</p><p>${sky}</p></div>
+      <dl class="now">${readings(p, roll, ['temp', 'rain', 'wind', 'vapour', 'pressure'])}</dl>`;
+  }
 
   function hover(p, ev) {
     hovered = p;
@@ -72,13 +88,14 @@ export function createExplorer(app, places) {
       return `<figure class="m-${m.id}"><figcaption>${m.label}<span>${(c || n)[S.day - 1].toFixed(1)} ${m.unit}</span></figcaption>${chart(n, c, S.day - 1)}</figure>`;
     }).join('') : '';
     const multi = S.mv && !$('causeBlock').hidden && !$('causeRun').hidden;
+    const held = card.contains(document.activeElement) ? document.activeElement.dataset.step : undefined;
     $('pcBody').innerHTML = `<p class="where">${p.sub}</p><h3 tabindex="-1">${p.name}</h3>
-      ${peak(t)}
-      ${t ? `<p class="watch">${chip(t)}${t.level ? ` <span>${summary(t)}</span>${badge(trust(t.peak, app.beyond() || huge(t)))}` : ''}</p>` : ''}
+      ${roll ? story(p) : '<p class="key">Waiting for the forecast.</p>'}
+      ${t ? `<h4>What your change does here</h4>${peak(t)}<p class="watch">${chip(t)}${t.level ? ` <span>${summary(t)}</span>${badge(trust(t.peak, app.beyond() || huge(t)))}` : ''}</p>` : ''}
       <div class="s-runrow">${multi ? '<button type="button" class="s-btn small primary" data-act="why">Why here?</button>' : ''}<button type="button" class="s-btn small" data-act="search">What influences it?</button></div>
-      ${roll ? `<p class="key">${S.mv ? 'Grey line: Timeline Prime. Coloured line: the Multiverse.' : 'The next ten days.'}</p>${charts}<dl class="now">${readings(p, shown(), ['temp', 'rain', 'wind', 'vapour', 'pressure'])}</dl><p class="key">Values on day ${S.day}.</p>` : '<p class="key">Waiting for the forecast.</p>'}
-      ${twins.length ? `<p class="key">Same 110 km grid square as ${shared}.</p>` : ''}
-      ${p.kind === 'city' && !document.body.classList.contains('flat-map') ? '<p class="key">Map buildings are illustrative.</p>' : ''}`;
+      ${roll ? `<h4>Ten days</h4><p class="key">${S.mv ? 'Grey line: without your change. Coloured line: with it. Click a day.' : 'Click a day.'}</p>${charts}` : ''}
+      <p class="key">The words describe the day's average over a square about 110 km wide${twins.length ? `, shared with ${shared}` : ''}; afternoons run warmer.${p.kind === 'city' && !document.body.classList.contains('flat-map') ? ' Map buildings are illustrative.' : ''}</p>`;
+    if (held !== undefined) card.querySelector(`[data-step="${held}"]`)?.focus({ preventScroll: true });
   }
 
   /** The same place as the analysis tabs know it (grouped small states share one entry there). */
@@ -102,7 +119,8 @@ export function createExplorer(app, places) {
   }
 
   card.onclick = (e) => {
-    const day = e.target.closest('[data-day]'); if (day) return app.setDay(+day.dataset.day);
+    const picked = e.target.closest('[data-day]'); if (picked) return app.setDay(+picked.dataset.day);
+    const step = e.target.closest('[data-step]'); if (step) return app.setDay(S.day + +step.dataset.step);
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
     const p = open;
     if (act === 'close') close();

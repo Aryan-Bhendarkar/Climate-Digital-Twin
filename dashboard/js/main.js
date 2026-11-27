@@ -352,15 +352,15 @@ async function init() {
   $('serverUrl').onchange = (e) => { S.api.base = e.target.value.trim(); localStorage.setItem('mm_server', S.api.url); S.prime = S.mv = null; checkHealth().then(() => S.init && S.healthy && runBase()); };
   document.querySelectorAll('#tabs button').forEach((b) => (b.onclick = () => selectTab(b.dataset.tab)));
   $('btnStory').addEventListener('click', () => play(false));
-  $('btnHow').onclick = () => { $('modal').hidden = false; $('btnClose').focus(); }; $('btnClose').onclick = () => ($('modal').hidden = true); $('modal').onclick = (e) => { if (e.target.id === 'modal') $('modal').hidden = true; };
+  $('btnHow').onclick = openTech;
   window.addEventListener('keydown', (e) => {
-    if (document.body.dataset.view !== 'expert') return;
+    if (document.body.dataset.view !== 'expert' || !document.getElementById('tech').hidden) return;
     if (/INPUT|SELECT|TEXTAREA|BUTTON|TH/.test(document.activeElement.tagName) && e.key !== 'Escape') return;
     if (e.key === ' ') { e.preventDefault(); play(!S.playing); }
     else if (e.key === 'ArrowRight') setDay(S.day + 1); else if (e.key === 'ArrowLeft') setDay(S.day - 1);
     else if (e.key >= '1' && e.key <= '5') setVar(+e.key - 1);
     else if (e.key === 'r' || e.key === 'R') runShock(); else if (e.key === 'n' || e.key === 'N') nullCheck();
-    else if (e.key === '?') $('modal').hidden = !$('modal').hidden; else if (e.key === 'Escape') $('modal').hidden = true;
+    else if (e.key === '?') openTech();
   });
   setVar(0); applyPreset('bob'); renderComps();
   window.addEventListener('resize', () => render());
@@ -369,6 +369,8 @@ async function init() {
   await loadSample(idx[0].file); checkOffline();
 }
 export const ready = init().catch((e) => { console.error(e); toast('Dashboard failed to start: ' + e.message); });
+
+function openTech() { play(false); import('./tech.js').then((m) => m.openTech()); }
 
 /** Story mode hands its live state to the expert view (same rollouts, no recomputation). */
 export function adopt(o) {
