@@ -6,7 +6,7 @@
 <title>Monsoon Multiverse</title>
 <script>
 // The 3D map below is the default UI; the "Survey Plate" UI (dashboard/v2/) is at ?ui=v2.
-if (new URLSearchParams(location.search).get('ui') === 'v2') location.replace('v2/' + location.search);
+if (['v2', 'v1'].includes(new URLSearchParams(location.search).get('ui'))) location.replace('v2/' + location.search);
 </script>
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/app.css">

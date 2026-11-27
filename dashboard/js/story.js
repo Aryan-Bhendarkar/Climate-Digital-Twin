@@ -323,8 +323,13 @@ async function forecast() {
 }
 
 // ---------- health ----------
+let healthMiss = 0;
 async function checkHealth() {
-  const h = await S.api.health(), was = S.healthy; S.healthy = h.ok;
+  if (S.busy && S.healthy) return;                       // a forecast is running: the server is busy, not down
+  const h = await S.api.health(), was = S.healthy;
+  healthMiss = h.ok ? 0 : healthMiss + 1;
+  if (!h.ok && was && healthMiss < 3) return;            // a slow machine can miss a poll: down only after 3 misses in a row
+  S.healthy = h.ok;
   if (h.ok && !was) { hideBanner(); if (S.init && !S.prime && !S.busy) forecast(); }
   if (!h.ok && (was || S.init) && $('sBanner').hidden) banner(h.status === 'loading' ? 'The model is loading. This page connects by itself.' : `The model isn’t running at ${S.api.url}. Start it with: python serve.py`); // the only place a server problem shows
 }
