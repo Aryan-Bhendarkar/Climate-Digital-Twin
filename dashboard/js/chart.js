@@ -31,12 +31,12 @@ export class LineChart {
     for (const tv of ticks) {
       const y = T + h - ((tv - lo) / (hi - lo)) * h, val = this.o.log ? Math.pow(10, tv) : tv;
       g.beginPath(); g.moveTo(L, y); g.lineTo(L + w, y); g.stroke();
-      g.fillText(this.o.log ? '1e' + tv : this.o.fmt(val), L - 5, y + 4);
+      g.fillText(this.o.log ? '10' + [...String(tv)].map((ch) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[ch] || '⁻').join('') : this.o.fmt(val), L - 5, y + 4);
     }
     g.textAlign = 'center';
     xs.forEach((v) => { if (xs.length <= 12 || v % 2 === 0) g.fillText(v, X(v), H - 10); });
     g.fillText(this.o.xLabel, L + w / 2, H - 0.5);
-    if (this.o.marker != null) { g.strokeStyle = 'rgba(255,255,255,.28)'; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X(this.o.marker), T); g.lineTo(X(this.o.marker), T + h); g.stroke(); g.setLineDash([]); }
+    if (this.o.marker != null) { g.strokeStyle = 'rgba(242,236,218,.35)'; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X(this.o.marker), T); g.lineTo(X(this.o.marker), T + h); g.stroke(); g.setLineDash([]); }
     for (const s of this.series) {
       g.strokeStyle = s.color; g.lineWidth = s.width || 2; g.setLineDash(s.dash || []); g.beginPath();
       s.y.forEach((v, k) => { const px = X(s.x[k]), py = Y(v); k ? g.lineTo(px, py) : g.moveTo(px, py); });
@@ -45,11 +45,11 @@ export class LineChart {
     }
     if (this.hover != null && this.hover >= L && this.hover <= L + w) {
       let best = 0, bd = 1e9; xs.forEach((v, k) => { const d = Math.abs(X(v) - this.hover); if (d < bd) { bd = d; best = k; } });
-      g.strokeStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.moveTo(X(xs[best]), T); g.lineTo(X(xs[best]), T + h); g.stroke();
+      g.strokeStyle = 'rgba(242,236,218,.55)'; g.beginPath(); g.moveTo(X(xs[best]), T); g.lineTo(X(xs[best]), T + h); g.stroke();
       const lines = [`${this.o.xLabel} ${xs[best]}`, ...this.series.map((s) => `${s.name}: ${this.o.fmt(s.y[best])}`)];
       const bw = Math.max(...lines.map((t) => g.measureText(t).width)) + 14, bx = X(xs[best]) + 8 + bw > W ? X(xs[best]) - bw - 8 : X(xs[best]) + 8;
-      g.fillStyle = 'rgba(12,16,26,.92)'; g.fillRect(bx, T + 2, bw, lines.length * 15 + 8);
-      g.textAlign = 'left'; lines.forEach((t, k) => { g.fillStyle = k ? this.series[k - 1].color : '#dde'; g.fillText(t, bx + 7, T + 17 + k * 15); });
+      g.fillStyle = 'rgba(27,34,25,.97)'; g.fillRect(bx, T + 2, bw, lines.length * 15 + 8); g.strokeStyle = 'rgba(242,236,218,.2)'; g.strokeRect(bx + 0.5, T + 2.5, bw - 1, lines.length * 15 + 7);
+      g.textAlign = 'left'; lines.forEach((t, k) => { g.fillStyle = k ? this.series[k - 1].color : '#f2ecda'; g.fillText(t, bx + 7, T + 17 + k * 15); });
     }
   }
 }

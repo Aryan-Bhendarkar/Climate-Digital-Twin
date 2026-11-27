@@ -3,116 +3,205 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Monsoon Multiverse — an AI twin of India's weather</title>
+<title>Monsoon Multiverse</title>
 <script>
-// UI routing: v3 ("Survey Plate", dashboard/v2/) is the default; the original Story/Expert UI stays at ?ui=v1 (and ?view=expert).
-(function () { var q = new URLSearchParams(location.search); if (q.get('ui') !== 'v1' && !q.get('view')) location.replace('v2/' + location.search); })();
+// The 3D map below is the default UI; the "Survey Plate" UI (dashboard/v2/) is at ?ui=v2.
+if (new URLSearchParams(location.search).get('ui') === 'v2') location.replace('v2/' + location.search);
 </script>
 <link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/story.css">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%2338bdf8'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%23cf6a12'/%3E%3Ccircle cx='8' cy='8' r='2.5' fill='%2387300a'/%3E%3C/svg%3E">
 </head>
 <body data-view="story">
 <div id="story">
+  <a class="s-skip" href="#sSteps">Skip to the panel</a>
   <header class="s-head">
     <div class="s-brand">
-      <span class="s-logo" aria-hidden="true"></span>
-      <div><h1>Monsoon Multiverse</h1><p class="s-tag">An AI twin of India's weather &mdash; see the next 10 days, then ask &ldquo;what if?&rdquo;</p></div>
+      <svg class="s-logo" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#70886a"/><path d="M20 22c1 6-1 10-5 15M19 31c-4-1-7-3-8-7 4 0 7 2 8 5M20 29c4 0 7-2 8-6-4 0-7 2-8 4" fill="none" stroke="#414828" stroke-width="2" stroke-linecap="round"/><path d="M20 23C9 23 6 14 8 9c5-1 10 3 12 8 2-5 7-9 12-8 2 5-1 14-12 14z" fill="#cf6a12"/><path d="M20 23c-5-3-7-10-4-16 3 0 5 2 4 5 1-3 3-5 4-5 3 6 1 13-4 16z" fill="#e5861f"/><path d="M20 23c-3-1-5-4-5-7 2 1 4 2 5 4 1-2 3-3 5-4 0 3-2 6-5 7z" fill="#87300a"/></svg>
+      <h1>Monsoon <em>Multiverse</em></h1>
     </div>
-    <div class="s-badges">
-      <span class="s-badge" id="bOffline" title="Nothing is downloaded or sent anywhere: the model runs on this computer.">Runs fully offline</span>
-      <span class="s-badge" id="bSpeed" title="Time the model needs to compute a full 10-day forecast of India.">~0.2 s per forecast</span>
-      <span class="s-badge warm" id="bHealth" title="Is the forecasting model running?">connecting&hellip;</span>
-      <button class="s-btn ghost" id="btnExpert" title="Switch to the detailed scientist dashboard with three maps, charts and tables">Expert view</button>
+    <nav class="s-tabs" role="tablist" aria-label="Views">
+      <i id="tabInk" aria-hidden="true"></i>
+      <button type="button" role="tab" data-tab="ask" id="tab-ask" aria-controls="pane-ask" aria-selected="true">What if</button>
+      <button type="button" role="tab" data-tab="influence" id="tab-influence" aria-controls="pane-influence" aria-selected="false" tabindex="-1">Influence</button>
+      <button type="button" role="tab" data-tab="test" id="tab-test" aria-controls="pane-test" aria-selected="false" tabindex="-1">Proof</button>
+    </nav>
+    <div class="s-tools">
+      <div class="s-findbox">
+        <label class="s-find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg><input id="sFind" list="sPlaces" placeholder="Find a city or state" aria-label="Find a city or state" autocomplete="off"><kbd aria-hidden="true">/</kbd></label><datalist id="sPlaces"></datalist>
+        <p class="s-findmsg" id="findMsg" role="status"></p>
+      </div>
+      <button type="button" class="s-tourbtn" id="btnTour" title="A one-minute guided tour">Take the tour</button>
+      <button type="button" class="s-link" id="btnExpert" title="Three maps, charts and tables">Expert view</button>
     </div>
   </header>
-  <div class="s-banner" id="sBanner" hidden>
-    <span id="sBannerTxt"></span>
-    <input id="sServer" aria-label="Model server address" spellcheck="false" title="Address of the model server">
-    <button class="s-btn small" id="sRetry">Retry</button>
-  </div>
   <div class="s-body">
-    <section class="s-stage" aria-label="Map of India">
-      <div class="s-cap"><h2 id="capTitle">Temperature, day 1 of 10</h2><p id="capSub"></p></div>
-      <div class="s-seg" id="segMode" role="group" aria-label="Which forecast to show on the map">
-        <button data-mode="normal" class="on" title="The AI's forecast if nothing unusual happens">Normal forecast</button>
-        <button data-mode="whatif" disabled title="The forecast after your what-if. Choose a what-if in step 2 first.">What-if</button>
-        <button data-mode="diff" disabled title="What-if minus normal: where and how much your what-if changes the weather. Choose a what-if in step 2 first.">Difference</button>
+    <aside class="s-side">
+      <div class="s-banner" id="sBanner" role="alert" hidden>
+        <p id="sBannerTxt"></p>
+        <label>Server address<input id="sServer" spellcheck="false"></label>
+        <button type="button" class="s-btn" id="sRetry">Retry</button>
       </div>
-      <div class="s-mapwrap" id="sMapWrap"><canvas id="sMap" aria-label="Map of India showing the forecast"></canvas><div class="s-busy" id="sBusy" hidden><i></i><span id="sBusyTxt">Running the AI&hellip;</span></div></div>
-      <div class="s-legend" id="sLegend"></div>
-    </section>
-    <aside class="s-steps" id="sSteps">
-      <section class="s-step" id="step1">
-        <h3><b>1</b> The forecast</h3>
-        <p class="s-lead">Pick a start date and press play: the AI forecasts India's next 10 days.</p>
-        <label class="s-field"><span>Start date (the AI sees the 3 days up to it)</span>
-          <select id="selDate" title="A real past situation to start from. The AI sees only the 3 days up to this date."></select></label>
-        <div class="s-field"><span>Show on the map</span><div class="s-chips" id="chipVar" role="group" aria-label="What to show on the map"></div></div>
-        <div class="s-play">
-          <button class="s-btn primary" id="sPlay" title="Play the 10-day forecast (Space)">&#9654; Play forecast</button>
-          <div class="s-slider"><input type="range" id="sDay" min="1" max="10" value="1" step="1" aria-label="Forecast day" title="Drag to move through the 10 forecast days (arrow keys work too)">
-            <div class="s-ticks"><span>Day 1</span><b id="dayNow">Day 1</b><span>Day 10</span></div></div>
+      <div class="s-steps" id="sSteps" tabindex="-1">
+        <div class="s-pane" data-pane="ask" id="pane-ask" role="tabpanel" aria-labelledby="tab-ask">
+          <section class="s-step" id="step1">
+            <div class="s-intro"><h3>Change the weather. See who feels it.</h3><p>A ten-day AI forecast, run on this computer.</p></div>
+            <label class="s-inline"><span>Start from</span><select id="selDate"></select></label>
+          </section>
+          <section class="s-step" id="step2">
+            <div class="s-seg wide" id="segGroup" role="group" aria-label="Kind of change">
+              <button type="button" data-group="everyday">Common</button>
+              <button type="button" data-group="extreme">Extreme</button>
+              <button type="button" data-group="mix">Build your own</button>
+            </div>
+            <div class="s-cards" id="cards"></div>
+            <div class="s-mix" id="mix" hidden>
+              <div id="mixRows"></div>
+              <label class="s-inline"><span>Area</span><select id="cuWhere"></select></label>
+              <p class="s-note">Or drag a box anywhere on the map.</p>
+              <p class="s-error" id="mixError" role="alert"></p>
+              <div class="s-runrow"><button type="button" class="s-btn primary" id="cuRun">Apply</button><button type="button" class="s-link" id="cuClear">Reset</button></div>
+            </div>
+            <div class="s-strength" id="strength" hidden>
+              <label for="stRange">Strength <output id="stOut" for="stRange">1&times;</output></label>
+              <input type="range" id="stRange" min="0.25" max="3" step="0.25" value="1">
+              <button type="button" class="s-link" id="scClear">Remove change</button>
+              <p class="s-warn" id="stWarn" role="status" hidden></p>
+            </div>
+            <p class="s-sum" id="scSum" hidden></p>
+          </section>
+          <aside class="s-place-card" id="placeCard" hidden><button type="button" class="s-close" id="pcClose">All places</button><div id="pcBody"></div></aside>
+          <section class="s-step" id="step3">
+            <p id="impactEmpty" class="s-empty">Pick a change above. The model forecasts both timelines, and the places that feel it appear here.</p>
+            <div id="impact" hidden>
+              <p class="s-headline" id="hdMain" tabindex="-1"></p>
+              <p class="s-if" id="hdIf"></p>
+              <div class="s-block">
+                <div class="s-blockhead"><h4>Who feels it</h4>
+                  <div class="s-seg" id="whoSeg" role="group" aria-label="Show cities or states"><button type="button" data-who="cities" class="on">Cities</button><button type="button" data-who="states">States</button></div></div>
+                <p class="s-counts" id="whoSum"></p>
+                <ol class="s-places" id="whoList"></ol>
+                <button type="button" class="s-link" id="whoMore">Show all</button>
+              </div>
+              <section class="s-block" id="sectors" aria-label="Farming, heat and wind power">
+                <div class="s-blockhead"><h4>Farming, heat, wind</h4><small>Indicative, from the two forecasts</small></div>
+                <div class="s-impacts">
+                  <article class="s-imp" id="impFarm"><h5>Kharif rain</h5><div class="s-big" id="farmBig"></div><p id="farmTxt"></p><button type="button" class="s-link" data-expert="kharif">Open in Expert view</button></article>
+                  <article class="s-imp" id="impHeat"><h5>Heat</h5><div class="s-big" id="heatBig"></div><p id="heatTxt"></p><button type="button" class="s-link" data-expert="kharif">Open in Expert view</button></article>
+                  <article class="s-imp" id="impWind"><h5>Wind power</h5><div class="s-big" id="windBig"></div><p id="windTxt"></p><button type="button" class="s-link" data-expert="wind">Open in Expert view</button></article>
+                </div>
+              </section>
+              <details class="s-block s-fold" id="causeBlock"><summary><h4>Why this happens</h4></summary>
+                <div class="s-causeform" id="causeForm">
+                  <label class="s-field"><span>Place</span><select id="causePlace"></select></label>
+                  <label class="s-field"><span>Measure</span><select id="causeKind"><option value="rain">10-day rain</option><option value="temp">Average temperature</option><option value="wind">Average wind</option></select></label>
+                </div>
+                <button type="button" class="s-btn" id="causeRun">Separate the causes</button>
+                <div id="causeOut" aria-live="polite"></div>
+              </details>
+              <details class="s-block s-fold s-how"><summary><h4>How to read this</h4></summary>
+                <table><tr><th>Daily change</th><th>Low</th><th>Medium</th><th>High</th></tr>
+                  <tr><th>Rain, mm</th><td>1</td><td>5</td><td>15</td></tr>
+                  <tr><th>Temperature, &deg;C</th><td>0.5</td><td>1.5</td><td>3</td></tr>
+                  <tr><th>Wind, km/h</th><td>3</td><td>8</td><td>15</td></tr></table>
+                <p><b>Firm</b> (solid line) is a change strongest on days 1 to 3, where the model beats simple references most clearly. <b>Rough</b> (dashed): days 4 to 7. <b>Direction only</b> (dotted): days 8 to 10, or a change beyond what the model has seen. Sizes are estimates: single trainings of this model can differ about 3 times, and the one running here averages three.</p>
+                <p><b>Not weather warnings.</b> Levels compare the Multiverse with Timeline Prime on a 110 km grid. For alerts, follow the India Meteorological Department.</p>
+              </details>
+            </div>
+          </section>
         </div>
-      </section>
-      <section class="s-step" id="step2">
-        <h3><b>2</b> Ask what-if</h3>
-        <p class="s-lead">Change the weather in one region and see how India reacts. Click a card.</p>
-        <div class="s-cards" id="cards"></div>
-        <div class="s-custom" id="custom" hidden>
-          <label class="s-field"><span>What changes</span><select id="cuWhat" title="Which weather quantity you want to change"></select></label>
-          <label class="s-field"><span>By how much</span><div class="s-amt"><input type="range" id="cuAmt" title="How strongly to change it"><output id="cuOut"></output></div></label>
-          <label class="s-field"><span>Where</span><select id="cuWhere" title="Region to change. You can also drag a box directly on the map."></select></label>
-          <p class="s-hint">Tip: drag a box on the map to choose your own region.</p>
-          <button class="s-btn primary" id="cuRun" title="Run the AI twice, with and without your change">Run my what-if</button>
+        <div class="s-pane" data-pane="influence" id="pane-influence" role="tabpanel" aria-labelledby="tab-influence" hidden>
+          <section class="s-step">
+            <p class="s-sentence">Which areas move <select id="infPlace" aria-label="Place to watch"></select>&rsquo;s <select id="infKind" aria-label="Measure"><option value="rain">10-day rain</option><option value="temp">average temperature</option><option value="wind">average wind</option></select> when made <select id="infNudge" aria-label="Change applied to each area"></select>?</p>
+            <div class="s-runrow"><button type="button" class="s-btn primary" id="infRun">Search 72 areas</button><button type="button" class="s-link" id="infStop" hidden>Stop</button></div>
+            <div class="s-progress" id="infBar" hidden><i></i></div>
+            <p class="s-note" id="infStatus" role="status"></p>
+          </section>
+          <section class="s-step" id="infResults" hidden>
+            <h3>Strongest areas</h3>
+            <p class="s-verdict" id="infVerdict"></p>
+            <ol class="s-found" id="infList"></ol>
+            <p class="s-note">Learned associations, not physical cause.</p>
+          </section>
         </div>
-        <p class="s-sum" id="scSum" hidden></p>
-      </section>
-      <section class="s-step dim" id="step3">
-        <h3><b>3</b> What changes for India</h3>
-        <div id="impactEmpty" class="s-empty">Pick a what-if in step 2. The map will then show where the weather changes, and what it means for farms, heat and wind power.</div>
-        <div id="impact" hidden>
-          <p class="s-if" id="hdIf"></p>
-          <p class="s-headline" id="hdMain"></p>
-          <div class="s-impacts">
-            <article class="s-imp" id="impFarm"><h4>Farmers <span>Kharif sowing</span></h4><div class="s-big" id="farmBig"></div><p id="farmTxt"></p><button class="s-link" data-open="kharif" title="Open the full state-by-state table in the Expert view">details</button></article>
-            <article class="s-imp" id="impHeat"><h4>Heat risk</h4><div class="s-big" id="heatBig"></div><p id="heatTxt"></p><button class="s-link" data-open="kharif" title="Open the full state-by-state table in the Expert view">details</button></article>
-            <article class="s-imp" id="impWind"><h4>Wind power</h4><div class="s-big" id="windBig"></div><p id="windTxt"></p><button class="s-link" data-open="wind" title="Open the wind-power table in the Expert view">details</button></article>
-          </div>
+        <div class="s-pane" data-pane="test" id="pane-test" role="tabpanel" aria-labelledby="tab-test" hidden>
+          <section class="s-step">
+            <h3 class="s-big-title">Can you trust it?</h3>
+            <p class="s-note">Forecast error, lower than the better of &ldquo;tomorrow is like today&rdquo; and the seasonal average:</p>
+            <dl class="s-skill"><div><dt>Day 1</dt><dd>32 %</dd></div><div><dt>Day 4</dt><dd>7 %</dd></div><div class="late"><dt>Day 8</dt><dd>&minus;1 %</dd></div></dl>
+            <p class="s-note">Averaged over 217 windows of 2019&ndash;21 by a copy of the model that never trained on those years (the recipe was chosen on them, so slightly optimistic). The shipped model was then trained on all years. By day 8 it is level with the seasonal average.</p>
+            <p class="s-runfacts" id="runFacts"></p>
+          </section>
+          <section class="s-step">
+            <h3>Live checks</h3>
+            <div class="s-runrow"><button type="button" class="s-btn primary" id="jgCurrent" disabled>Check this scenario</button><button type="button" class="s-btn" id="jgRandom">Random scenario</button></div>
+            <p class="s-note" id="jgWhat"></p>
+            <div id="jgResults" hidden><h4 id="jgScore" aria-live="polite"></h4><ol class="s-checks" id="jgList"></ol></div>
+          </section>
+          <section class="s-step"><h3>Spread by day</h3><div class="s-ripple"><canvas id="cvTrust"></canvas></div><p class="s-note" id="trustCap"></p></section>
+          <section class="s-step"><details class="s-fold s-how"><summary><h4>Paste your own request</h4></summary>
+            <p>A <code>[6][32][36]</code> perturbation or a full <code>/simulate</code> request.</p>
+            <textarea id="jgJson" rows="4" spellcheck="false" aria-label="Perturbation or request as JSON"></textarea>
+            <button type="button" class="s-btn" id="jgPaste">Run it</button>
+            <p class="s-error" id="jgError" role="alert"></p>
+          </details></section>
         </div>
-      </section>
-      <details class="s-trust" id="trust">
-        <summary title="Four quick checks that the AI behaves like real weather">Why trust it?</summary>
-        <ul>
-          <li><b id="tLocal">&ndash;</b><span>of the change stays where you applied it on day 1. The AI does not smear it across the whole country.</span></li>
-          <li><b>~900 km</b><span>per day is the most a change can travel (8 grid cells), like real weather systems.</span></li>
-          <li><b id="tNull">&ndash;</b><span id="tNullTxt">No change in &rarr; exactly the same forecast out.</span> <button class="s-link" id="sNull" title="Send a do-nothing change and check the forecast is identical">test again</button></li>
-          <li><b>24 %</b><span>more accurate than &ldquo;tomorrow = today&rdquo; on day 1, on years held out of training (2019&ndash;21). The final model was then retrained on all years.</span></li>
-        </ul>
-        <div class="s-ripple"><canvas id="cvTrust"></canvas></div>
-        <p class="s-cap2" id="trustCap">Run a what-if to see how the change spreads. Blue: change inside your area. Orange: change elsewhere. It starts small and grows slowly day by day: it spreads outward instead of jumping.</p>
-      </details>
+      </div>
     </aside>
+    <section class="s-stage" aria-label="Map of India">
+      <div class="s-mapwrap" id="sMapWrap"><canvas id="sMap" tabindex="0" aria-label="3D map of India. Arrow keys move, plus and minus zoom, Q and E turn, 0 shows all of India."></canvas><div class="s-pins" id="sPins"></div><div class="s-split" id="sSplit" role="slider" tabindex="0" aria-label="Compare divider: Prime on the left, Multiverse on the right" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" hidden><span>Prime</span><i aria-hidden="true"></i><span><em>Multiverse</em></span></div></div>
+      <div class="s-busy" id="sBusy" role="status" hidden><i></i><span id="sBusyTxt">Running forecast</span></div>
+      <div class="s-top"><div class="s-cap"><h2 id="capTitle">India, the next ten days</h2><p id="capSub"></p></div></div>
+      <aside class="s-tour" id="sTour" aria-live="polite" tabindex="-1" hidden><span data-n></span><i class="s-tourbar"><b></b></i><h3></h3><p></p><div class="s-runrow"><button type="button" class="s-btn primary" data-act="next">Next</button><button type="button" class="s-link" data-act="end">End tour</button></div></aside>
+      <div class="s-mapctl" role="group" aria-label="Map view">
+        <button type="button" id="mcIn" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button type="button" id="mcOut" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+        <button type="button" id="mcHome" title="All of India" aria-label="All of India"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6 10v10h12V10"/></svg></button>
+        <button type="button" id="mcTop" title="Look straight down" aria-label="Look straight down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2zM9 4v14M15 6v14"/></svg></button>
+        <button type="button" id="mcMotion" title="Weather motion" aria-label="Weather motion" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h10a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 11.5h7"/></svg></button>
+        <button type="button" id="mcPanel" title="Hide the panel" aria-label="Hide the panel" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M15 5v14"/></svg></button>
+      </div>
+      <div class="s-dock" id="sDock">
+        <div class="s-legend" id="sLegend"></div>
+        <div class="s-views" id="sToolbar">
+          <div class="s-seg" id="segMode" role="group" aria-label="Which forecast" hidden>
+            <button type="button" data-mode="diff" title="Multiverse minus Prime">Change</button>
+            <button type="button" data-mode="normal" class="on" title="Timeline Prime: the forecast as it is">Prime</button>
+            <button type="button" data-mode="whatif" title="The Multiverse: the forecast with your change"><em>Multiverse</em></button>
+            <button type="button" data-mode="split" title="Prime and Multiverse side by side, with a divider to drag">Compare</button>
+          </div>
+          <label class="s-smooth" id="smoothWrap" title="Show the exact difference as a continuous colour" hidden><input type="checkbox" id="sSmooth">Smooth</label>
+          <div class="s-chips" id="chipVar" role="group" aria-label="Map layer"></div>
+          <button type="button" class="s-btn" id="sSpread" hidden title="Follow the change outward from where you made it">Trace spread</button>
+        </div>
+        <div class="s-transport" id="sTransport">
+          <button type="button" class="s-playbtn" id="sPlay" title="Play (Space)" aria-label="Play"></button>
+          <div class="s-day"><small>Day</small><b id="dayNow">1</b></div>
+          <div class="s-fork"><svg id="sFork" aria-hidden="true"></svg><input type="range" id="sDay" min="1" max="10" value="1" step="1" aria-label="Forecast day"></div>
+        </div>
+        <p class="s-credits">NASA Earth Observatory, NOAA ETOPO 2022, <a href="https://www.geonames.org" target="_blank" rel="noopener noreferrer">GeoNames</a> (CC BY 4.0), Natural Earth</p>
+      </div>
+    </section>
   </div>
   <div class="s-tip" id="sTip" hidden></div>
 </div>
 <div id="expert" hidden>
 <header class="top">
-  <div class="brand"><span class="logo"></span><h1>Monsoon Multiverse <em>— India Climate Digital Twin</em></h1></div>
+  <div class="brand"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#70886a"/><path d="M20 22c1 6-1 10-5 15M19 31c-4-1-7-3-8-7 4 0 7 2 8 5M20 29c4 0 7-2 8-6-4 0-7 2-8 4" fill="none" stroke="#414828" stroke-width="2" stroke-linecap="round"/><path d="M20 23C9 23 6 14 8 9c5-1 10 3 12 8 2-5 7-9 12-8 2 5-1 14-12 14z" fill="#cf6a12"/><path d="M20 23c-5-3-7-10-4-16 3 0 5 2 4 5 1-3 3-5 4-5 3 6 1 13-4 16z" fill="#e5861f"/><path d="M20 23c-3-1-5-4-5-7 2 1 4 2 5 4 1-2 3-3 5-4 0 3-2 6-5 7z" fill="#87300a"/></svg><h1>Monsoon Multiverse<em>Expert view</em></h1></div>
   <div class="chips">
     <span class="chip ok" id="chipOffline" title="Counts network requests that leave this machine (the model server counts as local)"><i></i><span>offline · 0 external requests</span></span>
     <span class="chip" id="chipHealth"><i></i><span id="healthTxt">checking…</span></span>
     <label class="srv" title="Model server base URL"><input aria-label="Server URL" id="serverUrl" value="http://127.0.0.1:8000" spellcheck="false"></label>
     <button class="btn ghost" id="btnHow" title="How it works (?)">How it works</button>
-    <button class="btn primary" id="btnStory" title="Back to the guided Story mode">Story mode</button>
+    <button class="btn primary" id="btnStory" title="Back to the 3D map">Back to the map</button>
   </div>
 </header>
 
 <div class="layout">
 <aside class="side">
   <section>
-    <h3>Scenario <span class="hint">3-day initial condition</span></h3>
-    <select id="selSample"></select>
+    <h3>Start <span class="hint">the last 3 days of weather</span></h3>
+    <select id="selSample" aria-label="Start day"></select>
     <div class="row"><button class="btn small" id="btnLoad">Load JSON…</button><input type="file" id="fileJson" accept=".json,application/json" hidden><span class="hint" id="sampleInfo"></span></div>
   </section>
 
@@ -125,53 +214,53 @@
 
   <section>
     <h3>Forecast day <b id="dayLbl" class="mono">1</b><span class="hint"> / 10</span></h3>
-    <div class="row"><button class="btn small primary" id="btnPlay" title="Space">▶ Play</button><input type="range" id="rngDay" min="1" max="10" value="1" step="1"></div>
+    <div class="row"><button class="btn small primary" id="btnPlay" title="Space">▶ Play</button><input type="range" id="rngDay" min="1" max="10" value="1" step="1" aria-label="Forecast day"></div>
   </section>
 
   <section class="shock">
-    <h3>Shock painter <span class="hint">drag a box on any map</span></h3>
-    <select id="selPreset"></select>
-    <div class="boxline"><span id="boxLbl" class="mono">no box — drag on a map</span><button class="btn tiny ghost" id="btnClearBox">clear</button></div>
+    <h3>Shock <span class="hint">drag a box on any map</span></h3>
+    <select id="selPreset" aria-label="Shock preset"></select>
+    <div class="boxline"><span id="boxLbl" class="mono">No box yet. Drag on a map.</span><button class="btn tiny ghost" id="btnClearBox">Clear</button></div>
     <div id="comps" class="comps"></div>
     <div class="row add">
-      <select id="selVar"></select>
+      <select id="selVar" aria-label="Shock variable"></select>
       <input type="number" id="inMag" value="2" step="any" title="Magnitude">
-      <select id="selMode"><option value="abs">abs</option><option value="pct">%</option></select>
+      <select id="selMode" aria-label="Add or scale"><option value="abs">abs</option><option value="pct">%</option></select>
       <button class="btn small" id="btnAdd" title="Add this component to the shock">Add</button>
     </div>
     <div class="row"><button class="btn primary grow" id="btnRun" title="R">Run shock</button><button class="btn grow" id="btnNull" title="N">Null shock check</button></div>
     <div id="nullBadge" class="badge" hidden></div>
     <div id="clampNote" class="warn" hidden></div>
   </section>
-  <section class="foot hint">Space = play · ←/→ day · 1–5 variable · R run · N null · ? help</section>
+  <section class="foot hint">Keys: Space plays, arrows change the day, 1 to 5 pick a variable, R runs the shock, N runs the null check, ? opens help.</section>
 </aside>
 
 <main class="center">
   <div class="maps" id="maps">
-    <figure><figcaption><b>Timeline Prime</b><span id="capP" class="mono"></span></figcaption><div class="mapwrap" id="wrapP"><canvas id="cvP"></canvas></div><canvas class="cbar" id="cbP"></canvas></figure>
-    <figure><figcaption><b>Multiverse</b><span id="capM" class="mono"></span></figcaption><div class="mapwrap" id="wrapM"><canvas id="cvM"></canvas></div><canvas class="cbar" id="cbM"></canvas></figure>
-    <figure><figcaption><b>Δ Multiverse − Prime</b><span id="capD" class="mono"></span></figcaption><div class="mapwrap" id="wrapD"><canvas id="cvD"></canvas></div><canvas class="cbar" id="cbD"></canvas></figure>
+    <figure><figcaption><b>Timeline Prime</b><span id="capP" class="mono"></span></figcaption><div class="mapwrap" id="wrapP"><canvas id="cvP" aria-label="Timeline Prime map"></canvas></div><canvas class="cbar" id="cbP"></canvas></figure>
+    <figure><figcaption><b>Multiverse</b><span id="capM" class="mono"></span></figcaption><div class="mapwrap" id="wrapM"><canvas id="cvM" aria-label="Multiverse map"></canvas></div><canvas class="cbar" id="cbM"></canvas></figure>
+    <figure><figcaption><b>Difference</b><span id="capD" class="mono"></span></figcaption><div class="mapwrap" id="wrapD"><canvas id="cvD" aria-label="Difference map"></canvas></div><canvas class="cbar" id="cbD"></canvas></figure>
   </div>
   <div class="tabs" id="tabs">
-    <button data-tab="ripple" class="on">Ripple</button><button data-tab="cell">Cell series</button><button data-tab="kharif">Kharif Stress Monitor</button><button data-tab="wind">Wind-power index</button><span class="chip mono" id="chipMs" hidden></span>
+    <button data-tab="ripple" class="on">Ripple</button><button data-tab="cell">Cell series</button><button data-tab="kharif">Kharif stress</button><button data-tab="wind">Wind power</button><span class="chip mono" id="chipMs" hidden></span>
   </div>
   <div class="panes">
     <div class="pane on" id="pane-ripple">
       <div class="two">
-        <div class="chartbox"><div class="ctitle">Δ-energy per day · inside box+3 cells vs outside <label class="chk r"><input type="checkbox" id="chkLog" checked> log</label></div><canvas id="cvRipple" class="chart"></canvas>
-          <div class="legend"><span><i style="background:#22d3ee"></i>inside box+3</span><span><i style="background:#fb923c"></i>outside</span></div></div>
+        <div class="chartbox"><div class="ctitle">Size of the change per day, near the box and elsewhere <label class="chk r"><input type="checkbox" id="chkLog" checked> log</label></div><canvas id="cvRipple" class="chart" aria-label="Size of the change by day"></canvas>
+          <div class="legend"><span><i style="background:#3B6AA8"></i>within 3 cells of the box</span><span><i style="background:#C0703E"></i>elsewhere</span></div></div>
         <div class="stats" id="rippleStats"><div class="empty">Run a shock to see how it ripples.</div></div>
       </div>
     </div>
     <div class="pane" id="pane-cell">
       <div class="two">
-        <div class="chartbox"><div class="ctitle" id="cellTitle">Click a cell on any map</div><canvas id="cvCell" class="chart"></canvas><div class="legend"><span><i style="background:#60a5fa"></i>Prime</span><span><i style="background:#f472b6"></i>Multiverse</span><span class="hint">day 0 = last input day (shock applied)</span></div></div>
-        <div class="chartbox"><div class="ctitle">Δ at that cell</div><canvas id="cvCellD" class="chart"></canvas></div>
+        <div class="chartbox"><div class="ctitle" id="cellTitle">Click a cell on any map</div><canvas id="cvCell" class="chart"></canvas><div class="legend"><span><i style="background:#8fb8c4"></i>Prime</span><span><i style="background:#f2a35e"></i>Multiverse</span><span class="hint">Day 0 is the last input day, where the shock is applied.</span></div></div>
+        <div class="chartbox"><div class="ctitle">Difference at that cell</div><canvas id="cvCellD" class="chart"></canvas></div>
       </div>
     </div>
     <div class="pane" id="pane-kharif">
       <div class="khead"><div id="kHeadline" class="headline">Run a shock to compare states.</div><div class="hint" id="kSub"></div></div>
-      <div class="kbody"><canvas id="cvStates" class="statemap"></canvas><div class="tablewrap"><table id="kTable"></table></div></div>
+      <div class="kbody"><canvas id="cvStates" class="statemap" aria-label="Farm stress by state"></canvas><div class="tablewrap"><table id="kTable"></table></div></div>
     </div>
     <div class="pane" id="pane-wind">
       <div class="khead"><div id="wHeadline" class="headline">Run a shock to compare wind-power potential.</div></div>
@@ -187,11 +276,11 @@
 <div class="toasts" id="toasts"></div>
 <div class="overlay" id="busy" hidden><div class="spinner"></div><span id="busyTxt">Running model…</span></div>
 
-<div class="modal" id="modal" hidden><div class="card">
+<div class="modal" id="modal" hidden><div class="card" role="dialog" aria-modal="true" aria-label="How it works">
   <button class="btn ghost close" id="btnClose">✕</button>
   <h2>How it works</h2>
   <ul>
-    <li><b>The model.</b> A small fully-convolutional neural emulator steps India's weather one day at a time (t2m, rain, u10, v10, msl, tcwv on a 32×36, 1° grid), rolled forward autoregressively for 10 days from the last 3 observed days.</li>
+    <li><b>The model.</b> Three trained copies, averaged. Each is a small fully-convolutional neural emulator steps India's weather one day at a time (t2m, rain, u10, v10, msl, tcwv on a 32×36, 1° grid), rolled forward autoregressively for 10 days from the last 3 observed days.</li>
     <li><b>Anomalies, not raw fields.</b> It predicts the 1-day change of the anomaly from a smooth seasonal climatology (a few Fourier harmonics per cell, stored in the model weights). Rain is handled in log space so it cannot go negative.</li>
     <li><b>Local by construction.</b> Each step stacks 8 blocks with a single 3×3 convolution, so information can travel at most 8 cells per day. A shock therefore starts near where it is applied and spreads outward — the Ripple tab measures exactly this.</li>
     <li><b>Multi-step training.</b> After 1-step training it is fine-tuned on unrolled multi-day rollouts so it learns to correct its own errors and not drift or blur.</li>

@@ -37,7 +37,7 @@ function toast(msg, kind = 'err', ms = 6500) {
   const t = document.createElement('div'); t.className = 'toast ' + (kind === 'err' ? '' : 'info'); t.textContent = msg; $('toasts').appendChild(t); setTimeout(() => t.remove(), ms);
 }
 function busy(on, txt) {
-  S.busy += on ? 1 : -1; $('busyTxt').textContent = txt || 'Running model…'; $('busy').hidden = S.busy <= 0;
+  S.busy += on ? 1 : -1; $('busyTxt').textContent = txt || 'Running the model'; $('busy').hidden = S.busy <= 0;
   for (const id of ['btnRun', 'btnNull']) $(id).disabled = S.busy > 0;
 }
 const lonS = (v) => `${v}°E`, latS = (v) => `${v}°N`;
@@ -92,7 +92,7 @@ function render() {
     drawColorbar($('cbM'), v.cmapV, c.lo, c.hi, v.unit, nicefmt(v.dec)); drawColorbar($('cbD'), v.cmapD, -1, 1, 'Δ ' + v.unit, nicefmt(v.dec));
   }
   drawColorbar($('cbP'), v.cmapV, c.lo, c.hi, v.unit, nicefmt(v.dec));
-    $('capP').textContent = `${v.short} · day ${S.day}`; $('capM').textContent = S.shock ? S.shock.short : ''; $('capD').textContent = S.mv ? `max |Δ| ${nicefmt(v.dec)(S.deltaPerDay ? c.dday[d] : c.dmax)} ${v.unit}` : '';
+    $('capP').textContent = `${v.short}, day ${S.day}`; $('capM').textContent = S.shock ? S.shock.short : ''; $('capD').textContent = S.mv ? `max |Δ| ${nicefmt(v.dec)(S.deltaPerDay ? c.dday[d] : c.dmax)} ${v.unit}` : '';
   $('dayLbl').textContent = S.day; $('rngDay').value = S.day;
   updateCharts();
 }
@@ -100,7 +100,7 @@ function updateCharts() {
   if (!charts) return;
   if (S.rip) {
     const x = S.rip.inside.map((_, i) => i + 1), fl = (a) => a.map((q) => Math.max(q, 1e-12));
-    charts.ripple.set([{ name: 'inside', x, y: fl(S.rip.inside), color: '#22d3ee' }, { name: 'outside', x, y: fl(S.rip.outside), color: '#fb923c' }], { marker: S.day, log: $('chkLog').checked });
+    charts.ripple.set([{ name: 'near the box', x, y: fl(S.rip.inside), color: '#3B6AA8' }, { name: 'elsewhere', x, y: fl(S.rip.outside), color: '#C0703E' }], { marker: S.day, log: $('chkLog').checked });
   } else charts.ripple.set([]);
   drawCellCharts();
 }
@@ -110,12 +110,12 @@ function drawCellCharts() {
   $('cellTitle').textContent = `${v.label} at ${latS(lat(i))}, ${lonS(lon(j))} (${v.unit})`;
   const n = stepsOf(S.prime), x = Array.from({ length: n + 1 }, (_, d) => d);
   const p0 = v.f(S.init, 2, k), p = [p0, ...Array.from({ length: n }, (_, d) => v.f(S.prime, d, k))];
-  const series = [{ name: 'Prime', x, y: p, color: '#60a5fa' }];
+  const series = [{ name: 'Prime', x, y: p, color: '#8fb8c4' }];
   let dser = [];
   if (S.mv) {
     const m0 = S.mvInit ? v.f(S.mvInit, 0, k) : p0, m = [m0, ...Array.from({ length: n }, (_, d) => v.f(S.mv, d, k))];
-    series.push({ name: 'Multiverse', x, y: m, color: '#f472b6', dash: [5, 3] });
-    dser = [{ name: 'Δ', x, y: m.map((q, q2) => q - p[q2]), color: '#fbbf24' }];
+    series.push({ name: 'Multiverse', x, y: m, color: '#f2a35e', dash: [5, 3] });
+    dser = [{ name: 'Δ', x, y: m.map((q, q2) => q - p[q2]), color: '#c99a1e' }];
   }
   const f = (q) => (Math.abs(q) >= 100 ? q.toFixed(0) : q.toFixed(2));
   charts.cell.set(series, { marker: S.day, fmt: f }); charts.cellD.set(dser, { marker: S.day, fmt: (q) => q.toFixed(3), zero: true });
@@ -156,13 +156,13 @@ function setDrag(a, b) {
   const bx = { i0: Math.min(a.i, b.i), i1: Math.max(a.i, b.i), j0: Math.min(a.j, b.j), j1: Math.max(a.j, b.j) };
   for (const k of ['P', 'M', 'D']) panels[k].set({ dragBox: bx });
 }
-function updateBoxUI() { $('boxLbl').textContent = S.box ? boxLabel(S.box) : 'no box — drag on a map'; }
+function updateBoxUI() { $('boxLbl').textContent = S.box ? boxLabel(S.box) : 'No box yet. Drag on a map.'; }
 
 // ---------- shock UI ----------
 function compText(cp) { const u = cp.mode === 'pct' ? '%' : ' ' + DISPLAY_UNITS[cp.ch]; return `${CH[cp.ch].key} ${cp.value >= 0 ? '+' : ''}${cp.value}${u}`; }
 function renderComps() {
   const el = $('comps'); el.innerHTML = '';
-  if (!S.comps.length) el.innerHTML = '<span class="hint">no components — add one or choose a preset</span>';
+  if (!S.comps.length) el.innerHTML = '<span class="hint">No components yet. Add one or pick a preset.</span>';
   S.comps.forEach((cp, idx) => { const s = document.createElement('span'); s.className = 'comp'; s.textContent = compText(cp); const b = document.createElement('button'); b.textContent = '✕'; b.title = 'remove'; b.onclick = () => { S.comps.splice(idx, 1); renderComps(); }; s.appendChild(b); el.appendChild(s); });
 }
 function applyPreset(id) {
@@ -210,7 +210,7 @@ async function nullCheck() {
     const m = maxAbsDiff(r.roll, S.prime);
     S.mv = r.roll; S.msM = r.ms; S.mvInit = Float32Array.from(S.init.subarray(2 * NCH * NCELL)); S.shock = { box: S.box ? { ...S.box } : null, comps: [], desc: 'null shock (all zeros)', short: 'null shock' };
     const b = $('nullBadge'); b.hidden = false; b.className = 'badge ' + (m === 0 ? 'ok' : 'bad');
-    b.textContent = m === 0 ? '✔ IDENTICAL — null shock: max |Δ| = 0 (bit-for-bit)' : `✘ NOT identical — max |Δ| = ${m.toExponential(2)}`;
+    b.textContent = m === 0 ? 'Identical: a zero shock changes nothing, bit for bit (max |Δ| = 0).' : `Not identical: max |Δ| = ${m.toExponential(2)}.`;
     afterNewData(); setMs();
   } catch (e) { toast(e.message); } finally { busy(false); }
 }
@@ -234,18 +234,18 @@ function renderRippleStats() {
   $('rippleStats').innerHTML =
     card('Day-1 local share', isFinite(d1) ? (d1 * 100).toFixed(1) + '%' : '–', 'of Δ-energy inside box+3 cells (≥ 60% = localised)', d1 >= 0.6 ? 'good' : 'warnc') +
     card('Spread day 1 → 8', isFinite(grow) ? '×' + (grow >= 100 ? grow.toFixed(0) : grow.toFixed(1)) : '–', 'outside-box Δ-energy growth', grow > 1.5 ? 'good' : '') +
-    card('Peak |Δ|', mx.toFixed(2) + ' σ', 'largest change vs training std (stable < 5 σ)', mx < 5 ? 'good' : 'warnc') +
+    card('Peak |Δ|', mx.toFixed(2) + ' σ', 'largest change against the usual spread; 5 σ or more is flagged', mx < 5 ? 'good' : 'warnc') +
     card('Day-10 share', isFinite(fi[n - 1]) ? (fi[n - 1] * 100).toFixed(1) + '%' : '–', 'still inside box+3 (the rest has rippled outward)');
 }
 
 // ---------- impact ----------
-function stressColor(v) { return ['#34d399', '#a3e635', '#fbbf24', '#f97316', '#ef4444'][Math.min(4, Math.round(v * 4 / 3))]; }
+function stressColor(v) { return ['#6f8a4a', '#a39a3c', '#c99a1e', '#c0703e', '#8a3b22'][Math.min(4, Math.round(v * 4 / 3))]; }
 function renderImpact() {
   if (!S.assets || !S.prime) return;
   const mv = S.mv || S.prime, K = kharif(S.prime, mv, S.assets, S.doy); S.K = K;
   const hasMv = !!S.mv;
-  $('kHeadline').textContent = hasMv ? `${K.worse} state${K.worse === 1 ? '' : 's'} worsen · ${K.better} improve · all-India 10-day rain ${K.allIndiaRain.d >= 0 ? '+' : ''}${K.allIndiaRain.d.toFixed(1)}% vs Prime` : 'Timeline Prime baseline — run a shock to compare';
-  $('kSub').textContent = hasMv ? '' : 'Δ columns are zero until a shock is applied';
+  $('kHeadline').textContent = hasMv ? `${K.worse} state${K.worse === 1 ? '' : 's'} worsen and ${K.better} improve. All-India 10-day rain ${K.allIndiaRain.d >= 0 ? '+' : ''}${K.allIndiaRain.d.toFixed(1)} % against Prime.` : 'Timeline Prime. Run a shock to compare.';
+  $('kSub').textContent = hasMv ? '' : 'Difference columns stay at zero until a shock runs.';
   const cols = [['name', 'State / group', ''], ['rP', 'Rain P', '10-day area-mean rain, Prime (mm)'], ['rM', 'Rain M', '10-day area-mean rain, Multiverse (mm)'], ['dRain', 'Δ rain %', '(M − P) / max(P, 5 mm)'], ['band', 'IMD band', 'IMD departure band applied to the Δ vs Prime: Normal ±19%, Deficient −20..−59%, Scanty ≤ −60%, Excess ≥ +20%'], ['dryP', 'Dry P', 'Longest dry spell in days (state-mean rain < 2.5 mm/day), Prime'], ['dryM', 'Dry M', 'Longest dry spell, Multiverse'], ['hP', 'Heat P', 'Heat-stress days: state-mean t2m above the state monthly P95 (training climate), Prime'], ['hM', 'Heat M', 'Heat-stress days, Multiverse'], ['sP', 'Stress P', 'Stress tier 0-3 = 0.5·rain tier + 0.5·heat tier, Prime'], ['sM', 'Stress M', 'Stress tier, Multiverse'], ['dStress', 'Δ stress', 'Multiverse − Prime']];
   const val = { name: (r) => r.name, rP: (r) => r.p.total, rM: (r) => r.m.total, dRain: (r) => r.dRain, band: (r) => r.dRain, dryP: (r) => r.p.dry, dryM: (r) => r.m.dry, hP: (r) => r.p.heat, hM: (r) => r.m.heat, sP: (r) => r.p.stress, sM: (r) => r.m.stress, dStress: (r) => r.dStress };
   const rows = [...K.rows].sort((a, b) => { const x = val[S.sortKey](a), y = val[S.sortKey](b); const c = typeof x === 'string' ? x.localeCompare(y) : x - y; return (S.sortAsc ? c : -c) || a.dRain - b.dRain; });
@@ -254,15 +254,15 @@ function renderImpact() {
   const arrow = (d) => (d > 0 ? `<span class="up">▲ ${d.toFixed(1)}</span>` : d < 0 ? `<span class="down">▼ ${(-d).toFixed(1)}</span>` : '<span class="flat">–</span>');
   $('kTable').innerHTML = '<thead><tr>' + cols.map(([k, l, tt]) => `<th title="${tt}" data-k="${k}" class="${S.sortKey === k ? 'sorted' + (S.sortAsc ? ' asc' : '') : ''}">${l}</th>`).join('') + '</tr></thead><tbody>' +
     rows.map((r) => `<tr><td title="${r.id}">${r.name}</td><td>${r.p.total.toFixed(1)}</td><td>${r.m.total.toFixed(1)}</td><td>${sgn(r.dRain)}</td><td><span class="band ${r.band.key}">${r.band.label}</span></td><td>${r.p.dry}</td><td>${r.m.dry}</td><td>${r.p.heat}</td><td>${r.m.heat}</td><td>${pill(r.p.stress)}</td><td>${pill(r.m.stress)}</td><td>${arrow(r.dStress)}</td></tr>`).join('') + '</tbody>';
-  $('kTable').querySelectorAll('th').forEach((th) => (th.onclick = () => { const k = th.dataset.k; S.sortAsc = S.sortKey === k ? !S.sortAsc : k === 'name'; S.sortKey = k; renderImpact(); }));
+  $('kTable').querySelectorAll('th').forEach((th) => { th.tabIndex = 0; th.onclick = () => { const k = th.dataset.k; S.sortAsc = S.sortKey === k ? !S.sortAsc : k === 'name'; S.sortKey = k; renderImpact(); }; th.onkeydown = (e) => { if (e.key === 'Enter') th.onclick(); }; });
   drawStateMap(K);
   // wind
   const W = windIndex(S.prime, mv, S.assets);
   const best = [...W].sort((a, b) => Math.abs(b.dPct) - Math.abs(a.dPct))[0], sg = (x) => (Math.abs(x) < 0.05 ? '0.0' : (x > 0 ? '+' : '') + x.toFixed(1));
-  $('wHeadline').textContent = hasMv ? `Wind-power proxy: ${best.name} ${sg(best.dPct)}% (largest change of ${W.length} windy states)` : 'Wind-power index — Timeline Prime baseline';
-  $('wTable').innerHTML = '<thead><tr><th>State</th><th>CF Prime (10-day mean)</th><th>CF Multiverse</th><th>Δ CF %</th><th>10-day trace (P blue · M pink)</th></tr></thead><tbody>' +
+  $('wHeadline').textContent = hasMv ? `Largest change: ${best.name}, ${sg(best.dPct)} %, among the ${W.length} windiest states.` : 'Wind-power index for Timeline Prime.';
+  $('wTable').innerHTML = '<thead><tr><th>State</th><th>CF Prime (10-day mean)</th><th>CF Multiverse</th><th>Δ CF %</th><th>10 days (Prime solid, Multiverse dashed)</th></tr></thead><tbody>' +
     W.map((w) => `<tr><td>${w.name}</td><td>${w.pMean.toFixed(3)}</td><td>${w.mMean.toFixed(3)}</td><td class="${w.dPct < -0.05 ? 'up' : w.dPct > 0.05 ? 'down' : 'flat'}">${sgn(w.dPct)}</td><td style="text-align:center"><canvas width="140" height="26" data-id="${w.id}"></canvas></td></tr>`).join('') + '</tbody>';
-  $('wTable').querySelectorAll('canvas').forEach((cv) => { const w = W.find((x) => x.id === cv.dataset.id); spark(cv, w.p, '#60a5fa'); if (hasMv) spark(cv, w.m, '#f472b6', true, w.p); });
+  $('wTable').querySelectorAll('canvas').forEach((cv) => { const w = W.find((x) => x.id === cv.dataset.id); spark(cv, w.p, '#8fb8c4'); if (hasMv) spark(cv, w.m, '#f2a35e', true, w.p); });
 }
 function spark(cv, y, color, keep, other) {
   const g = cv.getContext('2d'), all = [...y, ...(other || [])], lo = Math.min(...all), hi = Math.max(...all), sp = hi - lo || 1;
@@ -278,9 +278,9 @@ function drawStateMap(K) {
   for (const st of S.outlines.states) {
     const r = byId[st.id]; if (!r) continue; g.beginPath();
     for (const ring of st.rings) for (let k = 0; k < ring.length; k += 2) { const [x, y] = P(ring[k], ring[k + 1]); k ? g.lineTo(x, y) : g.moveTo(x, y); }
-    g.fillStyle = stressColor(r.m.stress); g.globalAlpha = 0.9; g.fill('evenodd'); g.globalAlpha = 1; g.strokeStyle = '#0b0f19'; g.lineWidth = 0.6; g.stroke();
+    g.fillStyle = stressColor(r.m.stress); g.globalAlpha = 0.9; g.fill('evenodd'); g.globalAlpha = 1; g.strokeStyle = '#0a0e0b'; g.lineWidth = 0.8; g.stroke();
   }
-  g.fillStyle = '#93a3bf'; g.font = '10px system-ui'; g.fillText('Multiverse stress tier', 6, 12);
+  g.fillStyle = '#a2a997'; g.font = '11px system-ui'; g.fillText('Multiverse stress tier', 6, 13);
 }
 
 // ---------- scenario loading ----------
@@ -293,7 +293,7 @@ function setScenario(js, name) {
   return S.healthy ? runBase() : Promise.resolve();
 }
 async function loadSample(file) {
-  try { const js = await (await fetch('samples/' + file)).json(); await setScenario(js, js.name + (js.date_label ? ' · ' + js.date_label : '')); $('sampleInfo').textContent = ''; }
+  try { const js = await (await fetch('samples/' + file)).json(); await setScenario(js, js.name + (js.date_label ? ', ' + js.date_label : '')); $('sampleInfo').textContent = ''; }
   catch (e) { toast('Could not load scenario: ' + e.message); }
 }
 
@@ -332,7 +332,7 @@ async function init() {
   const [grid, heat, rainClim, idx] = await Promise.all(['assets/grid_states.json', 'assets/heat_p95.json', 'assets/rain_clim.json', 'samples/index.json'].map((u) => fetch(u).then((r) => r.json())));
   S.assets = { grid, heat, rainClim }; S.samples = idx;
   // controls
-  $('selSample').innerHTML = idx.map((s, k) => `<option value="${s.file}">${s.name} · ${s.date_label}</option>`).join('');
+  $('selSample').innerHTML = idx.map((s, k) => `<option value="${s.file}">${s.date_label}, ${s.name}</option>`).join('');
   $('segVar').innerHTML = VARS.map((v, k) => `<button title="${v.label} (${k + 1})">${v.short}</button>`).join('');
   document.querySelectorAll('#segVar button').forEach((b, k) => (b.onclick = () => setVar(k)));
   $('selPreset').innerHTML = Object.entries(PRESETS).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join('') + '<option value="custom">Custom (drag a box)</option>';
@@ -351,10 +351,11 @@ async function init() {
   $('serverUrl').value = S.api.url;
   $('serverUrl').onchange = (e) => { S.api.base = e.target.value.trim(); localStorage.setItem('mm_server', S.api.url); S.prime = S.mv = null; checkHealth().then(() => S.init && S.healthy && runBase()); };
   document.querySelectorAll('#tabs button').forEach((b) => (b.onclick = () => selectTab(b.dataset.tab)));
-  $('btnHow').onclick = () => ($('modal').hidden = false); $('btnClose').onclick = () => ($('modal').hidden = true); $('modal').onclick = (e) => { if (e.target.id === 'modal') $('modal').hidden = true; };
+  $('btnStory').addEventListener('click', () => play(false));
+  $('btnHow').onclick = () => { $('modal').hidden = false; $('btnClose').focus(); }; $('btnClose').onclick = () => ($('modal').hidden = true); $('modal').onclick = (e) => { if (e.target.id === 'modal') $('modal').hidden = true; };
   window.addEventListener('keydown', (e) => {
     if (document.body.dataset.view !== 'expert') return;
-    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && e.key !== 'Escape') return;
+    if (/INPUT|SELECT|TEXTAREA|BUTTON|TH/.test(document.activeElement.tagName) && e.key !== 'Escape') return;
     if (e.key === ' ') { e.preventDefault(); play(!S.playing); }
     else if (e.key === 'ArrowRight') setDay(S.day + 1); else if (e.key === 'ArrowLeft') setDay(S.day - 1);
     else if (e.key >= '1' && e.key <= '5') setVar(+e.key - 1);
