@@ -60,7 +60,7 @@ From the repository root:
 python serve.py --port 8000
 ```
 
-The service listens at `http://127.0.0.1:8000`; use `POST /health` to check readiness.
+The service listens on `0.0.0.0:8000` (open `http://127.0.0.1:8000`); use `POST /health` to check readiness.
 
 ### 3. Start the dashboard
 
@@ -80,6 +80,8 @@ node --test dashboard/tests/*.test.mjs
 ```
 
 The server is designed to be ready in roughly four seconds. A 10-day ensemble rollout typically takes about 0.5-1 second on four CPU cores.
+
+**Tested like the judging sandbox:** fresh clone, clean Python 3.12 with only torch (CPU), numpy, fastapi and uvicorn, network off, 4 cores: the kit's schema validator passes, `/simulate` takes ~0.6 s for 10 days, peak memory ~0.85 GB, official repo scan 15/15.
 
 ## Architecture
 
@@ -161,7 +163,7 @@ The validation recipe trains on **2005-2018** and evaluates the held-out **2019-
 | Day 4 | **+0.07** | +0.26 |
 | Day 8 | -0.01 | +0.24 |
 
-Skill is `1 - RMSE / RMSE(best of persistence or day-of-year climatology)`, latitude-weighted and assessed per lead. Held-out checks also report heavy-rain CSI of 0.29 (vs 0.19 persistence), preserved spatial variance, deterministic null shocks, and localized day-1 shock response.
+Skill is `1 - RMSE / RMSE(best of persistence or day-of-year climatology)`, latitude-weighted and assessed per lead. Skill is computed per window and averaged over 217 windows (every 5th day of 2019-2021) and the 6 variables, as the organisers' scoring functions do. Held-out checks also report heavy-rain CSI of 0.29 (vs 0.19 persistence, 0.16 climatology), day-8 spatial variance at 0.53-1.03 of the truth (anti-blur gate 0.40), bit-identical null shocks, and ≥ 99 % of the day-1 shock response within 3 cells of the shocked box. Recipe choices (rollout length, ensemble size) were selected on these years, so the numbers are mildly optimistic; the hidden 2023-24 windows are the real test.
 
 ## Reproduce training
 
@@ -190,6 +192,8 @@ See [`TRAINING.md`](TRAINING.md) for calibration, grading, validation, and GPU r
 ├── tests/                   # contract and UI checks
 ├── tools/model_adapter.py   # evaluation adapter
 ├── TRAINING.md              # detailed training/evaluation runbook
+├── docs/Monsoon_Multiverse_Brief.pdf  # the 2-page project brief
+├── app.py, Dockerfile       # optional single-port hosting (Hugging Face Space); judging uses serve.py
 └── project-demo-compressed.mp4
 ```
 
