@@ -259,7 +259,7 @@ function runMix() {
   runNew({ id: 'mix', title: 'Custom', area: r.say, box, values, focus: first });
 }
 function setupStep2() {
-  $('cards').innerHTML = SCENARIOS.map((s, i) => `<button type="button" class="s-card" data-id="${s.id}" data-group="${s.group}" title="${cap(describe(s.values))} over ${s.area}"><strong>${s.title}</strong><small>${cap(describe(s.values))}</small>${i ? '' : '<em>Start here</em>'}</button>`).join('');
+  $('cards').innerHTML = SCENARIOS.map((s, i) => `<button type="button" class="s-card" data-id="${s.id}" data-group="${s.group}" title="${cap(describe(s.values))} over ${s.area}"><strong>${s.title}</strong><small>${cap(describe(s.values))}</small>${s.id === 'dry' ? '<em>Start here</em>' : ''}</button>`).join('');
   document.querySelectorAll('.s-card').forEach((b) => { // show where a change would be made before it is chosen
     const sc = SCENARIOS.find((s) => s.id === b.dataset.id), show = () => { if (!S.mv && !S.busy) { S.box = boxFromLatLon(...sc.box); app.stage.render(); } }, hide = () => { if (!S.mv && !S.busy && S.group !== 'mix') { S.box = null; app.stage.render(); } };
     b.addEventListener('pointerenter', show); b.addEventListener('focus', show); b.addEventListener('pointerleave', hide); b.addEventListener('blur', hide);

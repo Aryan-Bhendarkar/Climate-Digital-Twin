@@ -93,4 +93,4 @@ There is also a **wind-power index** for the six major wind states (10 m wind â†
 ## Data & originality
 Trained only on the organiser-provided `india_climate_train.nc` (2005â€“2021). Nothing is downloaded at run time. All code, training and weights were built during the hackathon.
 
-Code: MIT (see `LICENSE`). Fonts: SIL OFL (`dashboard/ui/FONTS-LICENSE.txt`). State boundaries: Natural Earth (public domain). Data: organiser-provided, not redistributed.
+Code: MIT (see `LICENSE`). Fonts: SIL OFL (`dashboard/fonts/LICENSE.txt`). Map display only (never used by the model): state boundaries Natural Earth (public domain), relief NOAA ETOPO 2022, imagery NASA Blue Marble, town names GeoNames (CC BY 4.0). Data: organiser-provided, not redistributed.
