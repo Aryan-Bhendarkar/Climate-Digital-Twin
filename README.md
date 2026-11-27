@@ -1,14 +1,17 @@
-# Monsoon Multiverse
+<h1 align="center">Monsoon Multiverse</h1>
 
-<p align="center"><strong>An offline climate digital twin for India's monsoon - forecast the next 10 days, then explore what-if scenarios.</strong></p>
+<p align="center">
+  <strong>An offline climate digital twin for India's monsoon - forecast the next 10 days, then explore what-if scenarios.</strong>
+</p>
 
 <p align="center">
   <a href="#quick-start">Quick start</a> · <a href="#architecture">Architecture</a> · <a href="#dashboard">Dashboard</a> · <a href="#validation">Validation</a> · <a href="#limitations">Limitations</a>
 </p>
 
 <p align="center">
-  <strong>Live demo:</strong> <a href="https://huggingface.co/spaces/aryan273k/monsoon-multiverse">huggingface.co/spaces/aryan273k/monsoon-multiverse</a>
-  (dashboard and API hosted on Hugging Face; the local run below is the reference)
+  <a href="https://huggingface.co/spaces/aryan273k/monsoon-multiverse"><strong>Open the live demo on Hugging Face</strong></a>
+  <br>
+  <sub>Dashboard and API are hosted there; the local run below is the reference.</sub>
 </p>
 
 <p align="center">
@@ -18,9 +21,6 @@
   <img src="https://img.shields.io/badge/Mode-offline%20first-2E7D32" alt="Offline first">
   <img src="https://img.shields.io/badge/License-MIT-blue" alt="MIT License">
 </p>
-
-> [!IMPORTANT]
-> This is a scenario-exploration and research tool, not an operational weather-warning, agricultural-advisory, or emergency-response system.
 
 ## Overview
 
