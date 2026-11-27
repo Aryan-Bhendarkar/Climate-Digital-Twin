@@ -1,0 +1,11 @@
+.git
+__pycache__
+**/__pycache__
+*.pyc
+yug-monsoon-kit
+data
+dashboard/ui/node_modules
+.venv
+venv
+*.log
+*.nc

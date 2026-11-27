@@ -1,3 +1,6 @@
 dashboard/v2/** -text
 *.woff2 binary
 dashboard/ui/package-lock.json -text
+*.sh text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf

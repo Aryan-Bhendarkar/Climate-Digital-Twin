@@ -66,9 +66,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--model", default="http://127.0.0.1:8000")
+    ap.add_argument("--host", default="127.0.0.1", help="use 0.0.0.0 inside a container")
     a = ap.parse_args()
     Handler.model = a.model.rstrip("/")
-    srv = http.server.ThreadingHTTPServer(("127.0.0.1", a.port), partial(Handler, directory=str(Path(__file__).parent)))
+    srv = http.server.ThreadingHTTPServer((a.host, a.port), partial(Handler, directory=str(Path(__file__).parent)))
     print(f"dashboard: http://127.0.0.1:{a.port}/?server=api   (model: {Handler.model})")
     srv.serve_forever()
 
