@@ -7,6 +7,11 @@
 </p>
 
 <p align="center">
+  <strong>Live demo:</strong> <a href="https://huggingface.co/spaces/aryan273k/monsoon-multiverse">huggingface.co/spaces/aryan273k/monsoon-multiverse</a>
+  (dashboard and API hosted on Hugging Face; the local run below is the reference)
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/PyTorch-CPU%20%2F%20CUDA-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch">
   <img src="https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
